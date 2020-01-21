@@ -1,9 +1,5 @@
 # transformer-xl-refactoring
-> 对于论文
->
-> [Transformer-XL: Attentive Language Models Beyond a Fixed-Length Context]: http://arxiv.org/abs/1901.02860
->
-> 官方源码的重构
+对于论文 [Transformer-XL: Attentive Language Models Beyond a Fixed-Length Context](http://arxiv.org/abs/1901.02860) 官方源码的重构
 
 ## 目的
 

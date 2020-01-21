@@ -1,7 +1,7 @@
 # transformer-xl-refactoring
 > 对于论文
 >
-> [chrome-extension://cdonnmffkdaoajfknoeeecmchibpmkmg/assets/pdf/web/viewer.html?file=https%3A%2F%2Farxiv.org%2Fpdf%2F1901.02860.pdf]: 	"Transformer-XL: Attentive Language ModelsBeyond a Fixed-Length Context"
+> [Transformer-XL: Attentive Language Models Beyond a Fixed-Length Context]: http://arxiv.org/abs/1901.02860
 >
 > 官方源码的重构
 

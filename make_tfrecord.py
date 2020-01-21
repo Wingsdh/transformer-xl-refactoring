@@ -16,11 +16,22 @@ import tensorflow as tf
 from absl import flags
 
 import common.default_config as cfg
+from common.log import logger
 from corpus_generator.standard_generator import DirCorpusGenerator, FileCorpusGenerator
 from corpus_generator.wiki2019zh_generator import Wiki2019zhGenerator
 from data_processing.tfrecord_process import TFRecordMaker
 from data_processing.tokenizer import CharTokenizer, SpaceTokenizer, CustomTokenizer
 from data_processing.vocabulary import Vocabulary
+
+
+def check_paths():
+    # 语料路径必须存在
+    if not os.path.exists(FLAGS.dir_path):
+        raise ValueError('Oh,Oh, Data dir <{}> not exist'.format(FLAGS.dir_path))
+
+    if not os.path.exists(FLAGS.tfrecord_d_path):
+        logger.info('TFRecord dir <{}> not exist, create it'.format(FLAGS.tfrecord_d_path))
+        os.makedirs(FLAGS.tfrecord_d_path)
 
 
 def build_tokenizer():
@@ -65,6 +76,9 @@ def build_vocabulary(tokenizer, corpus_iter=None):
 
 def main(unused_argv):
     del unused_argv  # Unused
+    # 校验路径
+    check_paths()
+
     # 语料迭代器
     corpus_iter = build_corpus_iter()
 

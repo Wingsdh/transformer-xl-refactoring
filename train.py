@@ -24,7 +24,17 @@ from common.log import logger
 from data_processing.tfrecord_process import TFRecorderLoader
 from layer.loss import mask_adaptive_logsoftmax, average_grads_and_vars
 from layer.train_op import get_train_op_fn
-from model.transformer_xl import get_transformer_xl_fn
+from model.transformer_xl import build_transformer_xl
+
+
+def check_paths():
+    # TFRecord 路径必须存在
+    if not os.path.exists(FLAGS.tfrecord_d_path):
+        raise ValueError('Oh,Oh, TFRecord dir <{}> not exist'.format(FLAGS.dir_path))
+
+    if not os.path.exists(FLAGS.model_dir):
+        logger.info('Model dir <{}> not exist, create it'.format(FLAGS.model_dir))
+        os.makedirs(FLAGS.model_dir)
 
 
 def build_dataset():
@@ -193,6 +203,9 @@ def train_process(info, tower_mems, tower_new_mems, loss, train_op, learning_rat
 
 def main(unused_argv):
     del unused_argv  # Unused
+
+    check_paths()
+
     # 数据
     info, inputs, labels = build_dataset()
 

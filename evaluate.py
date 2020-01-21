@@ -1,26 +1,26 @@
 # -*- encoding: utf-8 -*-
 """
 -------------------------------------------------
-   File Name：    train.py
+   File Name：    evaluate.py
    Description :
    Author :       Wings DH
-   Time：         2020/1/19 11:23 上午
+   Time：         2020/1/21 2:08 下午
 -------------------------------------------------
    Change Activity:
-                   2020/1/19: Create
+                   2020/1/21: Create
 -------------------------------------------------
 """
 import math
 import os
+import sys
 
-import numpy as np
 import tensorflow as tf
 from absl import flags
+import numpy as np
 
 import common.default_config as cfg
 from common.log import logger
 from data_processing.tfrecord_process import TFRecorderLoader
-from layer.train_op import get_train_op_fn
 from model.transformer_xl import build_transformer_xl
 
 
@@ -41,10 +41,10 @@ def build_dataset():
     input_feed, label_feed = dataset.make_one_shot_iterator().get_next()
     _inputs = tf.split(input_feed, FLAGS.num_core_per_host, 0)
     _labels = tf.split(label_feed, FLAGS.num_core_per_host, 0)
-    return tf_record_loader.info, _inputs, _labels
+    return tf_record_loader.info, _inputs, _labels, label_feed
 
 
-def build_train_graph(inputs, labels, n_token):
+def build_eval_graph(inputs, labels, n_token):
     def build_initializer():
         _initializer = None
         _proj_initializer = None
@@ -69,25 +69,14 @@ def build_train_graph(inputs, labels, n_token):
                                                                              initializer,
                                                                              proj_initializer)
 
-    grads, all_vars = zip(*grads_and_vars)
-
-    # clip gradient
-    # gnorm 就是所有梯度的平方和
-    clipped, gnorm = tf.clip_by_global_norm(grads, FLAGS.clip)
-    grads_and_vars = list(zip(clipped, all_vars))
-
-    # 已训练步数
-    global_step = tf.train.get_or_create_global_step()
-
-    # 定义train_op
-    train_fn = get_train_op_fn(FLAGS.train_steps, FLAGS.learning_rate, FLAGS.warmup_steps, FLAGS.min_lr_ratio)
-    train_op, learning_rate = train_fn(grads_and_vars=grads_and_vars, global_step=global_step)
-    return tower_mems, tower_new_mems, loss, train_op, learning_rate, gnorm, global_step
+    return loss, tower_mems, tower_new_mems
 
 
-def train_process(info, tower_mems, tower_new_mems, loss, train_op, learning_rate, gnorm, global_step):
+def evaluate_process(label_feed, info, tower_mems, tower_new_mems, loss):
     num_batches = info.n_batch
-    # Training loop
+    logger.info('Eval Data has {} batches'.format(num_batches))
+
+    # Evaluate
     per_core_bsz = FLAGS.batch_size // FLAGS.num_core_per_host
 
     tower_mems_np = [
@@ -98,22 +87,23 @@ def train_process(info, tower_mems, tower_new_mems, loss, train_op, learning_rat
 
     with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as sess:
         sess.run(tf.global_variables_initializer())
-        logger.info("Start train transformer-xl lm for dataset:{}".format(FLAGS.dataset))
+        if FLAGS.eval_ckpt_path is None:
+            eval_ckpt_path = tf.train.latest_checkpoint(FLAGS.model_dir)
+        else:
+            eval_ckpt_path = FLAGS.eval_ckpt_path
 
-        if FLAGS.warm_start_path is not None:
-            logger.info("warm start from {}".format(FLAGS.warm_start_path))
-            try:
-                init_ckpt_path = tf.train.latest_checkpoint(FLAGS.warm_start_path)
-                saver.restore(sess, init_ckpt_path)
-            except ValueError:
-                logger.warning('restore fail invalid path:{}'.format(FLAGS.warm_start_path))
+        logger.info("Evaluate {}".format(eval_ckpt_path))
+        saver.restore(sess, eval_ckpt_path)
 
-        fetches = [loss, tower_new_mems, global_step, gnorm, learning_rate, train_op]
+        fetches = [loss, tower_new_mems, tf.size(label_feed)]
 
-        total_loss, prev_step = 0., -1
-        init_step = sess.run(global_step)
-        epoch = init_step // num_batches
-        while True:
+        format_str = "  >> processing batch {{:{0}d}}/{{:{0}d}} ..".format(len(str(num_batches)))
+
+        total_loss, total_cnt = 0, 0
+        for step in range(num_batches):
+            if step % (num_batches // 10) == 0:
+                logger.info(format_str.format(step, num_batches))
+
             feed_dict = {}
             for i in range(FLAGS.num_core_per_host):
                 for m, m_np in zip(tower_mems[i], tower_mems_np[i]):
@@ -121,44 +111,29 @@ def train_process(info, tower_mems, tower_new_mems, loss, train_op, learning_rat
 
             fetched = sess.run(fetches, feed_dict=feed_dict)
 
-            loss_np, tower_mems_np, curr_step, gnorm_np, lr_np = fetched[:5]
-            total_loss += loss_np
+            loss_np, tower_mems_np, cnt_np = fetched[:3]
+            total_loss += loss_np * cnt_np
+            total_cnt += cnt_np
 
-            if curr_step > 0 and curr_step % num_batches == 0:
-                epoch += 1
-                if curr_step > 0 and epoch % FLAGS.iterations == 0:
-                    curr_loss = total_loss / (curr_step - prev_step)
-                    logger.info(
-                        "[{}] lr {:8.6f} | loss {:.2f} | pplx {:>7.2f} | bpc {:>7.4f} | gnorm {:>7.4f}".format(
-                            epoch, lr_np, curr_loss, math.exp(curr_loss), curr_loss / math.log(2), gnorm_np))
-
-                    total_loss, prev_step = 0., curr_step
-
-                if curr_step > 0 and epoch % FLAGS.save_steps == 0:
-                    save_path = os.path.join(FLAGS.model_dir, "model-{}.ckpt".format(curr_step))
-                    saver.save(sess, save_path)
-                    logger.info("Epoch {} Model saved in path: {}".format(epoch, save_path))
-
-            if curr_step == FLAGS.train_steps:
-                break
-
-        logger.info("run {} epochs:".format(FLAGS.train_steps // num_batches))
+        avg_loss = total_loss / total_cnt
+        logger.info("| loss {:.2f} | pplx {:>7.2f}, bpc {:>7.4f}".format(
+            avg_loss, math.exp(avg_loss), avg_loss / math.log(2)))
 
 
-def main(unused_argv):
-    del unused_argv  # Unused
+def main(argv=None):
+    if argv is None:
+        argv = sys.argv
 
     check_paths()
 
     # 数据
-    info, inputs, labels = build_dataset()
+    info, inputs, labels, label_feed = build_dataset()
 
-    # 训练图
-    tower_mems, tower_new_mems, loss, train_op, learning_rate, gnorm, global_step = build_train_graph(inputs, labels,
-                                                                                                      info.n_token)
+    # 构建图
+    loss, tower_mems, tower_new_mems = build_eval_graph(inputs, labels, info.n_token)
 
-    # 训练
-    train_process(info, tower_mems, tower_new_mems, loss, train_op, learning_rate, gnorm, global_step)
+    # 评估过程
+    evaluate_process(label_feed, info, tower_mems, tower_new_mems, loss)
 
 
 if __name__ == "__main__":
@@ -179,6 +154,11 @@ if __name__ == "__main__":
                              "If set, will clear Adam states."
                              "Note that the new model_dir should be different"
                              " from warm_start_path.")
+
+    flags.DEFINE_string("eval_ckpt_path", None,
+                        help="Checkpoint path for do_test evaluation."
+                             "If set, model_dir will be ignored."
+                             "If unset, will use the latest ckpt in model_dir.")
     flags.DEFINE_integer("num_core_per_host", cfg.DEFAULT_NUM_CORE_PER_HOST, help="number of core")
 
     flags.DEFINE_integer("train_steps", default=cfg.TRAIN_STEPS,

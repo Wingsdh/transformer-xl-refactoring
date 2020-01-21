@@ -13,8 +13,10 @@
 
 import tensorflow as tf
 
+from common.gpu_utils import assign_to_gpu
 from layer.attention import build_rel_multihead_attn_func
 from layer.embedding import get_mask_adaptive_embedding_lookup_fn
+from layer.loss import average_grads_and_vars, mask_adaptive_logsoftmax
 from layer.position_embedding import positional_embedding
 
 
@@ -158,3 +160,59 @@ def get_transformer_xl_fn(n_token, n_layer, d_model, d_embed,
         return logit, output, new_mems
 
     return transformer_xl
+
+
+def build_transformer_xl(inputs, labels, flags, n_token, initializer, proj_initializer):
+    per_core_bsz = flags.batch_size // flags.num_core_per_host
+
+    transformer_xl = get_transformer_xl_fn(n_token=n_token,
+                                           n_layer=flags.n_layer,
+                                           d_model=flags.d_model,
+                                           d_embed=flags.d_embed,
+                                           n_head=flags.n_head,
+                                           d_head=flags.d_head,
+                                           d_inner=flags.d_inner,
+                                           dropout=flags.dropout,
+                                           dropatt=flags.dropatt,
+                                           initializer=initializer,
+                                           proj_initializer=proj_initializer,
+                                           is_training=True,
+                                           same_length=flags.same_length,
+                                           clamp_len=flags.clamp_len,
+                                           untie_r=flags.untie_r)
+    _tower_mems, tower_losses, _tower_new_mems, tower_grads_and_vars = [], [], [], []
+
+    # assign_to_gpu(i, ps_device)
+    for i in range(flags.num_core_per_host):
+        inp = tf.transpose(inputs[i], [1, 0])
+        target = tf.transpose(labels[i], [1, 0])
+
+        with tf.device(assign_to_gpu(i)), tf.variable_scope(tf.get_variable_scope(), reuse=tf.AUTO_REUSE):
+            mems = [tf.placeholder(tf.float32, [flags.mem_len, per_core_bsz, flags.d_model])
+                    for _ in range(flags.n_layer)]
+
+            logit, output, new_mems = transformer_xl(inp, mems)
+
+            # loss
+            loss_i = mask_adaptive_logsoftmax(logit_output=logit, target=target)
+
+            # 梯度
+            _all_vars = tf.trainable_variables()
+            _grads = tf.gradients(loss_i, _all_vars)
+            grads_and_vars_i = list(zip(_grads, _all_vars))
+
+            _tower_mems.append(mems)
+            tower_losses.append(loss_i)
+            _tower_new_mems.append(new_mems)
+            tower_grads_and_vars.append(grads_and_vars_i)
+
+    #  average losses and gradients across towers
+    # 合并所有GPU的loss和梯度
+    if len(tower_losses) > 1:
+        _loss = tf.add_n(tower_losses) / len(tower_losses)
+        _grads_and_vars = average_grads_and_vars(tower_grads_and_vars)
+    else:
+        _loss = tower_losses[0]
+        _grads_and_vars = tower_grads_and_vars[0]
+
+    return _loss, _grads_and_vars, _tower_mems, _tower_new_mems

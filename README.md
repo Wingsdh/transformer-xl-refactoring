@@ -1,2 +1,8 @@
 # transformer-xl-refactoring
-A refactored version of kimiyoung / transformer-xl/tf
+对于论文源码的重构
+
+
+
+参考：
+
+[https://github.com/kimiyoung/transformer-xl](https://github.com/kimiyoung/transformer-xl)

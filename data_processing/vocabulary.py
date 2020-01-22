@@ -18,6 +18,9 @@ from tqdm import tqdm
 from common.log import logger
 from data_processing.tokenizer import SpaceTokenizer, ITextTokenizer
 
+NO_LIMIT_MAX_N_WORD = -1
+NO_LIMIT_MIN_FREQ = 0
+
 
 def _save_vocab_to_file(vocab, save_file_path):
     """ 保存词库到txt文件
@@ -33,7 +36,7 @@ def _save_vocab_to_file(vocab, save_file_path):
             logger.info('Save vocab into {vocab_file}'.format(vocab_file=save_file_path))
 
 
-def _arrange_vocab_from_corpus(corpus_iter, tokenizer):
+def _arrange_vocab_from_corpus(corpus_iter, tokenizer, max_n_tokens=NO_LIMIT_MAX_N_WORD, min_freq=NO_LIMIT_MIN_FREQ):
     """
     从语料中获取词库
     :param corpus_iter: 关于corpus的迭代器, 每次迭代输出一个token列表
@@ -56,7 +59,7 @@ def _arrange_vocab_from_corpus(corpus_iter, tokenizer):
         for token in tokens:
             vocab.count_token(token)
 
-    vocab.build_vocab_from_word_count()
+    vocab.build_vocab_from_word_count(max_n_tokens, min_freq)
 
     return vocab
 
@@ -101,8 +104,6 @@ class Vocabulary(ABC):
     INDEX_END = 3
     INDEX_ORIGIN_CUSTOM = 4
 
-    NO_LIMIT_MAX_N_WORD = -1
-
     @property
     def index_token(self):
         return self._index_token
@@ -116,8 +117,8 @@ class Vocabulary(ABC):
         return self._token_count
 
     @classmethod
-    def new_from_corpus(cls, corpus_iter, tokenizer):
-        return _arrange_vocab_from_corpus(corpus_iter, tokenizer)
+    def new_from_corpus(cls, corpus_iter, tokenizer, max_n_tokens=NO_LIMIT_MAX_N_WORD, min_freq=NO_LIMIT_MIN_FREQ):
+        return _arrange_vocab_from_corpus(corpus_iter, tokenizer, max_n_tokens, min_freq)
 
     @classmethod
     def new_from_save_file(cls, f_path, tokenizer=None):
@@ -157,7 +158,7 @@ class Vocabulary(ABC):
         self._token_index[token] = index
         self._index_token[index] = token
 
-    def build_vocab_from_word_count(self, max_n_tokens=NO_LIMIT_MAX_N_WORD):
+    def build_vocab_from_word_count(self, max_n_tokens=NO_LIMIT_MAX_N_WORD, min_freq=NO_LIMIT_MIN_FREQ):
         self._token_index = {}
         self._index_token = {}
 
@@ -174,8 +175,12 @@ class Vocabulary(ABC):
         wcounts.sort(key=lambda x: x[1], reverse=True)
 
         for cnt, (w, c) in enumerate(wcounts):
-            if max_n_tokens != self.NO_LIMIT_MAX_N_WORD and cnt > max_n_tokens:
+            if max_n_tokens != NO_LIMIT_MAX_N_WORD and cnt > max_n_tokens - 1:
                 break
+
+            if c < min_freq:
+                break
+
             self.add_token_index(w, index)
             index += 1
         logger.info('Build vocab, volume:{size_word_index}'.format(size_word_index=len(self.token_index)))

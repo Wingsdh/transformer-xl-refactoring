@@ -10,6 +10,7 @@
                    2020/1/3: Create
 -------------------------------------------------
 """
+import os
 import shutil
 import unittest
 
@@ -31,8 +32,10 @@ class VocabularyTestCase(unittest.TestCase):
     KEY_EXPECT_TOKEN_INDEX = 'expect_t_i'
     KEY_EXPECT_INDEX_TOKEN = 'expect_i_t'
 
-    KWARGS_KEY_CORPUS = 'line_iter'
+    KWARGS_KEY_CORPUS = 'corpus_iter'
     KWARGS_KEY_TOKENIZER = 'tokenizer'
+    KWARGS_KEY_MAX_N_TOKENS = 'max_n_tokens'
+    KWARGS_KEY_MIN_FREQ = 'min_freq'
 
     TEMP_D_PATH = 'temp/'
 
@@ -62,6 +65,45 @@ class VocabularyTestCase(unittest.TestCase):
                                      Vocabulary.TOKEN_START: 2,
                                      Vocabulary.TOKEN_END: 3,
                                      '一': 4, '二': 5, '三': 6},
+            KEY_SAVE_FILE: 'temp/vocab.txt',
+        },
+        {
+            # 限定最大词数
+            KEY_NEW_PARAMS: {
+                KWARGS_KEY_CORPUS: FileCorpusGenerator.new_instance('data/test_corpus/standard/corpus1.txt'),
+                KWARGS_KEY_TOKENIZER: CharTokenizer.new_instance(),
+                KWARGS_KEY_MAX_N_TOKENS: 1,
+                KWARGS_KEY_MIN_FREQ: 0,
+            },
+            KEY_EXPECT_INDEX_TOKEN: {0: Vocabulary.TOKEN_PAD,
+                                     1: Vocabulary.TOKEN_UNKNOWN,
+                                     2: Vocabulary.TOKEN_START,
+                                     3: Vocabulary.TOKEN_END,
+                                     4: '一'},
+            KEY_EXPECT_TOKEN_INDEX: {Vocabulary.TOKEN_PAD: 0,
+                                     Vocabulary.TOKEN_UNKNOWN: 1,
+                                     Vocabulary.TOKEN_START: 2,
+                                     Vocabulary.TOKEN_END: 3,
+                                     '一': 4, },
+            KEY_SAVE_FILE: 'temp/vocab.txt',
+        },
+        {
+            # 限定最小词频
+            KEY_NEW_PARAMS: {
+                KWARGS_KEY_CORPUS: FileCorpusGenerator.new_instance('data/test_corpus/standard/corpus1.txt'),
+                KWARGS_KEY_TOKENIZER: CharTokenizer.new_instance(),
+                KWARGS_KEY_MIN_FREQ: 2,
+            },
+            KEY_EXPECT_INDEX_TOKEN: {0: Vocabulary.TOKEN_PAD,
+                                     1: Vocabulary.TOKEN_UNKNOWN,
+                                     2: Vocabulary.TOKEN_START,
+                                     3: Vocabulary.TOKEN_END,
+                                     4: '一', 5: '二'},
+            KEY_EXPECT_TOKEN_INDEX: {Vocabulary.TOKEN_PAD: 0,
+                                     Vocabulary.TOKEN_UNKNOWN: 1,
+                                     Vocabulary.TOKEN_START: 2,
+                                     Vocabulary.TOKEN_END: 3,
+                                     '一': 4, '二': 5},
             KEY_SAVE_FILE: 'temp/vocab.txt',
         },
     ]
@@ -98,8 +140,6 @@ class VocabularyTestCase(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    import os
-
     os.chdir('../')
 
     unittest.main()

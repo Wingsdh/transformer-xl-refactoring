@@ -60,7 +60,7 @@ class CharTokenizer(ITextTokenizer):
         return cls()
 
     def tokenize(self, text):
-        return list(text)
+        return [c for c in text if c != ' ']
 
 
 class CustomTokenizer(ITextTokenizer):

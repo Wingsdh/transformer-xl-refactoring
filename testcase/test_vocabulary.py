@@ -20,6 +20,7 @@ from common.log import logger
 from corpus_generator.standard_generator import FileCorpusGenerator
 from data_processing.tokenizer import CharTokenizer
 from data_processing.vocabulary import Vocabulary
+from data_processing.text_processor import Number2NProcessor
 
 
 @ddt
@@ -31,11 +32,15 @@ class VocabularyTestCase(unittest.TestCase):
     KEY_SAVE_FILE = 'save_file'
     KEY_EXPECT_TOKEN_INDEX = 'expect_t_i'
     KEY_EXPECT_INDEX_TOKEN = 'expect_i_t'
+    KEY_TEXT = 'inp_text'
+    KEY_EXPECT = 'expect'
 
     KWARGS_KEY_CORPUS = 'corpus_iter'
     KWARGS_KEY_TOKENIZER = 'tokenizer'
+    KWARGS_KEY_TEXT_PROCESSOR = 'text_processor'
     KWARGS_KEY_MAX_N_TOKENS = 'max_n_tokens'
     KWARGS_KEY_MIN_FREQ = 'min_freq'
+    KWARGS_KEY_F_PATH = 'f_path'
 
     TEMP_D_PATH = 'temp/'
 
@@ -132,6 +137,37 @@ class VocabularyTestCase(unittest.TestCase):
         vocab = Vocabulary.new_from_save_file(target_f_path)
         self.assertDictEqual(vocab.token_index, expect_token_index)
         self.assertDictEqual(vocab.index_token, expect_index_token)
+
+    test_data_text2seq = [
+
+        {
+            # 正常输入
+            KEY_NEW_PARAMS: {
+                KWARGS_KEY_F_PATH: 'data/vocab.txt',
+                KWARGS_KEY_TOKENIZER: CharTokenizer(),
+            },
+            KEY_TEXT: '一1二2',
+            KEY_EXPECT: [4, 1, 5, 1]
+        },
+        {
+            # 增加文本处理器
+            KEY_NEW_PARAMS: {
+                KWARGS_KEY_F_PATH: 'data/vocab.txt',
+                KWARGS_KEY_TOKENIZER: CharTokenizer(),
+                KWARGS_KEY_TEXT_PROCESSOR: Number2NProcessor()
+            },
+            KEY_TEXT: '一1二2',
+            KEY_EXPECT: [4, 7, 5, 7]
+        }
+    ]
+
+    @data(*test_data_text2seq)
+    def testVocabularyBuild(self, test_data):
+        # 从语料加载词库
+        params = test_data[self.KEY_NEW_PARAMS]
+        vocab = Vocabulary.new_from_save_file(**params)
+        expect = vocab.text_to_sequence(test_data[self.KEY_TEXT])
+        self.assertSequenceEqual(expect, test_data[self.KEY_EXPECT])
 
     @classmethod
     def tearDownClass(cls):

@@ -93,6 +93,11 @@ class CharTokenizerTestCase(unittest.TestCase):
             KEY_EXPECT: ['A', '你', 'B', 'C', '好', '啊']
         },
         {
+            # 夹杂空格
+            KEY_INP_TEXT: 'A 你  BC   好啊',
+            KEY_EXPECT: ['A', '你', 'B', 'C', '好', '啊']
+        },
+        {
             # 空文本
             KEY_INP_TEXT: '',
             KEY_EXPECT: []

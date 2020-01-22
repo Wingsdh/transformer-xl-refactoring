@@ -16,6 +16,7 @@ from collections import OrderedDict
 from tqdm import tqdm
 
 from common.log import logger
+from data_processing.text_processor import ITextProcessor
 from data_processing.tokenizer import SpaceTokenizer, ITextTokenizer
 
 NO_LIMIT_MAX_N_WORD = -1
@@ -36,7 +37,11 @@ def _save_vocab_to_file(vocab, save_file_path):
             logger.info('Save vocab into {vocab_file}'.format(vocab_file=save_file_path))
 
 
-def _arrange_vocab_from_corpus(corpus_iter, tokenizer, max_n_tokens=NO_LIMIT_MAX_N_WORD, min_freq=NO_LIMIT_MIN_FREQ):
+def _arrange_vocab_from_corpus(corpus_iter,
+                               tokenizer=None,
+                               text_processor=None,
+                               max_n_tokens=NO_LIMIT_MAX_N_WORD,
+                               min_freq=NO_LIMIT_MIN_FREQ):
     """
     从语料中获取词库
     :param corpus_iter: 关于corpus的迭代器, 每次迭代输出一个token列表
@@ -51,8 +56,11 @@ def _arrange_vocab_from_corpus(corpus_iter, tokenizer, max_n_tokens=NO_LIMIT_MAX
     elif not isinstance(tokenizer, ITextTokenizer):
         raise ValueError('tokenizer:<{}> must instance of ITextTokenizer'.format(type(tokenizer)))
 
-    vocab = Vocabulary(tokenizer=tokenizer)
+    vocab = Vocabulary(tokenizer=tokenizer, text_processor=text_processor)
     for line in tqdm(corpus_iter):
+        # 如果需要经过文本预处理，那统计词频应当同样经过预处理
+        if text_processor is not None:
+            line = text_processor.process(line)
 
         tokens = tokenizer.tokenize(line)
 
@@ -64,8 +72,8 @@ def _arrange_vocab_from_corpus(corpus_iter, tokenizer, max_n_tokens=NO_LIMIT_MAX
     return vocab
 
 
-def _load_from_token_count_txt(path, tokenizer=None):
-    vocab = Vocabulary(tokenizer=tokenizer)
+def _load_from_token_count_txt(path, tokenizer=None, text_processor=None):
+    vocab = Vocabulary(tokenizer=tokenizer, text_processor=text_processor)
     try:
         logger.info('Start load token_count txt')
         with open(path, 'r', encoding='utf-8') as f:
@@ -117,12 +125,16 @@ class Vocabulary(ABC):
         return self._token_count
 
     @classmethod
-    def new_from_corpus(cls, corpus_iter, tokenizer, max_n_tokens=NO_LIMIT_MAX_N_WORD, min_freq=NO_LIMIT_MIN_FREQ):
-        return _arrange_vocab_from_corpus(corpus_iter, tokenizer, max_n_tokens, min_freq)
+    def new_from_corpus(cls, corpus_iter,
+                        tokenizer=None,
+                        text_processor=None,
+                        max_n_tokens=NO_LIMIT_MAX_N_WORD,
+                        min_freq=NO_LIMIT_MIN_FREQ):
+        return _arrange_vocab_from_corpus(corpus_iter, tokenizer, text_processor, max_n_tokens, min_freq)
 
     @classmethod
-    def new_from_save_file(cls, f_path, tokenizer=None):
-        return _load_from_token_count_txt(f_path, tokenizer)
+    def new_from_save_file(cls, f_path, tokenizer=None, text_processor=None):
+        return _load_from_token_count_txt(f_path, tokenizer, text_processor=text_processor)
 
     @staticmethod
     def save_vocab(vocab, f_path):
@@ -134,7 +146,7 @@ class Vocabulary(ABC):
         """
         _save_vocab_to_file(vocab, f_path)
 
-    def __init__(self, tokenizer=None):
+    def __init__(self, tokenizer=None, text_processor=None):
 
         # 初始化词库
         self._token_index = {}
@@ -142,11 +154,16 @@ class Vocabulary(ABC):
         self._token_count = OrderedDict()
 
         # 初始化分词器
-        if tokenizer is None:
+        if tokenizer is None or not isinstance(tokenizer, ITextTokenizer):
             # 默认使用空格来做分词
             self.tokenizer = SpaceTokenizer.new_instance()
         else:
             self.tokenizer = tokenizer
+
+        # 初始化文本处理器
+        if text_processor is not None and not isinstance(text_processor, ITextProcessor):
+            raise TypeError("text_processor isn't instance of ITextProcessor but {}".format(type(text_processor)))
+        self.text_processor = text_processor
 
     def count_token(self, token):
         if token in self.token_count:
@@ -197,7 +214,8 @@ class Vocabulary(ABC):
         if add_start:
             sequence.append(self.token_index[Vocabulary.TOKEN_START])
 
-        sequence.extend([self.token_index.get(c, self.token_index[Vocabulary.TOKEN_UNKNOWN]) for c in tokens])
+        sequence.extend(
+            [self.token_index.get(c, self.token_index[Vocabulary.TOKEN_UNKNOWN]) for c in tokens if c != ' '])
 
         if add_end:
             sequence.append(self.token_index[Vocabulary.TOKEN_END])
@@ -212,8 +230,15 @@ class Vocabulary(ABC):
         :param add_end:
         :return:
         """
-        # 先用分词器将一段文本转成tokens
+
+        # 文本预处理
+        if self.text_processor is not None:
+            text = self.text_processor.process(text)
+
+        # 用分词器将一段文本转成tokens
         tokens = self.tokenizer.tokenize(text)
+
+        # token转为索引
         return self.tokens_to_sequence(tokens, add_start=add_start, add_end=add_end)
 
     def texts_to_sequences(self, texts, add_start=False, add_end=False):

@@ -14,7 +14,6 @@ import unittest
 
 from ddt import ddt, data
 
-from common.log import logger
 from corpus_generator.standard_generator import FileCorpusGenerator, DirCorpusGenerator
 
 
@@ -27,7 +26,7 @@ class SingleFileCorpusGeneratorTestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        logger.info('Start test SingleFileCorpusGeneratorTestCase functions')
+        print('Start test SingleFileCorpusGeneratorTestCase functions')
 
     def setUp(self):
         # 预设基本数据
@@ -49,7 +48,7 @@ class SingleFileCorpusGeneratorTestCase(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        logger.info('Finish test SingleFileCorpusGeneratorTestCase functions')
+        print('Finish test SingleFileCorpusGeneratorTestCase functions')
 
 
 @ddt
@@ -63,7 +62,7 @@ class DirCorpusGeneratorTestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        logger.info('Start test DirCorpusGeneratorTestCase functions')
+        print('Start test DirCorpusGeneratorTestCase functions')
 
     test_data = [
         # 递归参数
@@ -105,7 +104,7 @@ class DirCorpusGeneratorTestCase(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        logger.info('Finish test DirCorpusGeneratorTestCase functions')
+        print('Finish test DirCorpusGeneratorTestCase functions')
 
 
 @ddt
@@ -119,7 +118,7 @@ class Wiki2019zhGeneratorTestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        logger.info('Start test Wiki2019zhGeneratorTestCase functions')
+        print('Start test Wiki2019zhGeneratorTestCase functions')
 
     def setUp(self):
         # 预设基本数据
@@ -138,11 +137,11 @@ class Wiki2019zhGeneratorTestCase(unittest.TestCase):
 
         line_iter = DirCorpusGenerator(self.TEST_DIR_PATH, encoding='utf-8', recursive=True, split_func=split_line)
         for idx, line in enumerate(line_iter):
-            logger.info("{}:{}".format(idx, line))
+            print("{}:{}".format(idx, line))
 
     @classmethod
     def tearDownClass(cls):
-        logger.info('Finish test Wiki2019zhGeneratorTestCase functions')
+        print('Finish test Wiki2019zhGeneratorTestCase functions')
 
 
 if __name__ == '__main__':

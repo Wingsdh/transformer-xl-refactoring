@@ -13,10 +13,9 @@
 import unittest
 
 from ddt import ddt, data
-
-from common.log import logger
-from data_processing.tokenizer import SpaceTokenizer, CharTokenizer, CustomTokenizer
 import jieba
+
+from data_processing.tokenizer import SpaceTokenizer, CharTokenizer, CustomTokenizer
 
 
 @ddt
@@ -29,7 +28,7 @@ class SpaceTokenizerTestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        logger.info('Start test SpaceTokenizer functions')
+        print('Start test SpaceTokenizer functions')
 
     def setUp(self):
         # 预设基本数据
@@ -67,7 +66,7 @@ class SpaceTokenizerTestCase(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        logger.info('Finish test SpaceTokenizer functions')
+        print('Finish test SpaceTokenizer functions')
 
 
 @ddt
@@ -80,7 +79,7 @@ class CharTokenizerTestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        logger.info('Start test CharTokenizer functions')
+        print('Start test CharTokenizer functions')
 
     def setUp(self):
         # 预设基本数据
@@ -113,7 +112,7 @@ class CharTokenizerTestCase(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        logger.info('Finish test CharTokenizer functions')
+        print('Finish test CharTokenizer functions')
 
 
 @ddt
@@ -126,7 +125,7 @@ class CustomTokenizerTestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        logger.info('Start test CustomTokenizerTestCase functions')
+        print('Start test CustomTokenizerTestCase functions')
 
     def setUp(self):
         # 预设基本数据
@@ -157,7 +156,7 @@ class CustomTokenizerTestCase(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        logger.info('Finish test CustomTokenizerTestCase functions')
+        print('Finish test CustomTokenizerTestCase functions')
 
 
 if __name__ == '__main__':

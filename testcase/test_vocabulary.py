@@ -16,7 +16,6 @@ import unittest
 
 from ddt import ddt, data
 
-from common.log import logger
 from corpus_generator.standard_generator import FileCorpusGenerator
 from data_processing.tokenizer import CharTokenizer
 from data_processing.vocabulary import Vocabulary
@@ -46,7 +45,7 @@ class VocabularyTestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        logger.info('Start test Vocabulary functions')
+        print('Start test Vocabulary functions')
         if not os.path.exists(cls.TEMP_D_PATH):
             os.mkdir(cls.TEMP_D_PATH)
 
@@ -172,7 +171,7 @@ class VocabularyTestCase(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         shutil.rmtree(cls.TEMP_D_PATH)  # 递归删除文件夹
-        logger.info('Finish test Vocabulary functions')
+        print('Finish test Vocabulary functions')
 
 
 if __name__ == '__main__':

@@ -17,7 +17,6 @@ import unittest
 from ddt import ddt
 import tensorflow as tf
 
-from common.log import logger
 from corpus_generator.standard_generator import DirCorpusGenerator
 from data_processing.tfrecord_process import TFRecordMaker, TFRecorderLoader
 from data_processing.tokenizer import CharTokenizer
@@ -43,7 +42,7 @@ class TFRecordProcessTestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        logger.info('Start test TFRecordProcessTestCase functions')
+        print('Start test TFRecordProcessTestCase functions')
         if not os.path.exists(cls.TEMP_D_PATH):
             os.mkdir(cls.TEMP_D_PATH)
 
@@ -66,14 +65,14 @@ class TFRecordProcessTestCase(unittest.TestCase):
         with tf.Session() as sess:
             for _ in range(tf_record_loader.info.n_batch):
                 _x, _y = sess.run([input_feed, label_feed])
-                logger.debug('X:{}'.format(self.vocab.sequences_to_texts(_x)))
-                logger.debug('y:{}'.format(self.vocab.sequences_to_texts(_y)))
+                print('X:{}'.format(self.vocab.sequences_to_texts(_x)))
+                print('y:{}'.format(self.vocab.sequences_to_texts(_y)))
 
-        logger.debug(tf_record_loader.info)
+        print(tf_record_loader.info)
 
     @classmethod
     def tearDownClass(cls):
-        logger.info('Finish test TFRecordProcessTestCase functions')
+        print('Finish test TFRecordProcessTestCase functions')
         shutil.rmtree(cls.TEMP_D_PATH)
 
 

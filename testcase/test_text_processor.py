@@ -14,7 +14,6 @@ import unittest
 
 from ddt import ddt, data
 
-from common.log import logger
 from data_processing.text_processor import Number2NProcessor, CommonEnglishProcessor, MixProcessor
 
 
@@ -28,7 +27,7 @@ class Number2NProcessorTestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        logger.info('Start test Number2NProcessor functions')
+        print('Start test Number2NProcessor functions')
 
     def setUp(self):
         self.text_processor = Number2NProcessor()
@@ -73,7 +72,7 @@ class Number2NProcessorTestCase(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        logger.info('Finish test Number2NProcessor functions')
+        print('Finish test Number2NProcessor functions')
 
 
 @ddt
@@ -86,7 +85,7 @@ class CommonEnglishProcessorTestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        logger.info('Start test CommonEnglishProcessor functions')
+        print('Start test CommonEnglishProcessor functions')
 
     def setUp(self):
         self.text_processor = CommonEnglishProcessor()
@@ -111,7 +110,7 @@ class CommonEnglishProcessorTestCase(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        logger.info('Finish test CommonEnglishProcessor functions')
+        print('Finish test CommonEnglishProcessor functions')
 
 
 @ddt
@@ -124,7 +123,7 @@ class MixProcessorTestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        logger.info('Start test MixProcessor functions')
+        print('Start test MixProcessor functions')
 
     def setUp(self):
         num_processor = Number2NProcessor()
@@ -152,7 +151,7 @@ class MixProcessorTestCase(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        logger.info('Finish test MixProcessor functions')
+        print('Finish test MixProcessor functions')
 
 
 if __name__ == '__main__':

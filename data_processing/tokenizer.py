@@ -17,7 +17,6 @@ class ITextTokenizer(ABC):
     """
     分词器基类
     """
-    TYPE = 'base'
 
     @classmethod
     @abstractmethod
@@ -39,7 +38,6 @@ class SpaceTokenizer(ITextTokenizer):
     """
     按照空格分词
     """
-    TYPE = 'space'
 
     @classmethod
     def new_instance(cls, *args, **kwargs):
@@ -53,7 +51,6 @@ class CharTokenizer(ITextTokenizer):
     """
     按照字符分词
     """
-    TYPE = 'char'
 
     @classmethod
     def new_instance(cls, *args, **kwargs):
@@ -67,7 +64,6 @@ class CustomTokenizer(ITextTokenizer):
     """
     自定义分词
     """
-    TYPE = 'custom'
     ARG_KEY_FUNC = 'func'
 
     @classmethod

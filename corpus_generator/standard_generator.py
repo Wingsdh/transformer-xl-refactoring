@@ -16,7 +16,6 @@ from corpus_generator.base_generator import ICorpusGenerator
 
 
 class FileCorpusGenerator(ICorpusGenerator):
-    TYPE = 'file'
 
     @property
     def f_path(self):
@@ -49,7 +48,6 @@ class FileCorpusGenerator(ICorpusGenerator):
 
 
 class DirCorpusGenerator(ICorpusGenerator):
-    TYPE = 'dir'
 
     @property
     def d_path(self):
@@ -63,38 +61,35 @@ class DirCorpusGenerator(ICorpusGenerator):
     def recursive(self):
         return self._recursive
 
-    @property
-    def check_func(self):
-        return self._check_func
-
     @classmethod
-    def new_instance(cls, d_path, encoding='utf-8', recursive=False, check_func=None):
+    def new_instance(cls, d_path, encoding='utf-8', recursive=False, check_func=None, split_func=None):
         """
         目录语料迭代器工厂方法
         :param d_path: 语料目录路径
         :param encoding: 语料文件编码格式，default:'utf-8'
         :param recursive: 是否递归子目录，default:False
         :param check_func: 单个文件校验规则 default:None
+        :param split_func: 单行语料是否需要拆分 default:None
         :return: DirCorpusGenerator 实例
         """
         if not os.path.exists(d_path):
             raise FileNotFoundError('DirCorpusGenerator d_path:{} must exist '.format(d_path))
-        return cls(d_path, encoding, recursive, check_func)
+        return cls(d_path, encoding, recursive, check_func, split_func)
 
-    @staticmethod
-    def split_line(line):
-        return [line]
-
-    def __init__(self, d_path, encode='utf-8', recursive=False, check_func=None):
+    def __init__(self, d_path, encoding='utf-8', recursive=False, check_func=None, split_func=None):
         self._d_path = d_path
-        self._encoding = encode
+        self._encoding = encoding
         self._recursive = recursive
         self._check_func = check_func
+        self._split_func = split_func
 
     def __iter__(self):
-        file_names = self.list_all_file(self.d_path, recursive=self.recursive, check_func=self.check_func)
+        file_names = self.list_all_file(self.d_path, recursive=self.recursive, check_func=self._check_func)
         for p in file_names:
             with open(p, 'r', encoding='utf8') as file:
                 for line in file:
-                    for per_yield in self.split_line(line.strip()):
-                        yield per_yield
+                    if self._split_func is not None:
+                        for per_yield in self._split_func(line.strip()):
+                            yield per_yield
+                    else:
+                        yield line.strip()

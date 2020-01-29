@@ -65,7 +65,7 @@ def _arrange_vocab_from_corpus(corpus_iter,
         tokens = tokenizer.tokenize(line)
 
         for token in tokens:
-            vocab.count_token(token)
+            vocab._count_token(token)
 
     vocab.build_vocab_from_word_count(max_n_tokens, min_freq)
 
@@ -165,13 +165,13 @@ class Vocabulary(ABC):
             raise TypeError("text_processor isn't instance of ITextProcessor but {}".format(type(text_processor)))
         self.text_processor = text_processor
 
-    def count_token(self, token):
+    def _count_token(self, token):
         if token in self.token_count:
             self.token_count[token] += 1
         else:
             self.token_count[token] = 1
 
-    def add_token_index(self, token, index):
+    def _add_token_index(self, token, index):
         self._token_index[token] = index
         self._index_token[index] = token
 
@@ -180,10 +180,10 @@ class Vocabulary(ABC):
         self._index_token = {}
 
         # 默认占前4位索引
-        self.add_token_index(Vocabulary.TOKEN_PAD, Vocabulary.INDEX_PAD)
-        self.add_token_index(Vocabulary.TOKEN_UNKNOWN, Vocabulary.INDEX_UNKNOWN)
-        self.add_token_index(Vocabulary.TOKEN_START, Vocabulary.INDEX_START)
-        self.add_token_index(Vocabulary.TOKEN_END, Vocabulary.INDEX_END)
+        self._add_token_index(Vocabulary.TOKEN_PAD, Vocabulary.INDEX_PAD)
+        self._add_token_index(Vocabulary.TOKEN_UNKNOWN, Vocabulary.INDEX_UNKNOWN)
+        self._add_token_index(Vocabulary.TOKEN_START, Vocabulary.INDEX_START)
+        self._add_token_index(Vocabulary.TOKEN_END, Vocabulary.INDEX_END)
 
         index = Vocabulary.INDEX_ORIGIN_CUSTOM
 
@@ -198,7 +198,7 @@ class Vocabulary(ABC):
             if c < min_freq:
                 break
 
-            self.add_token_index(w, index)
+            self._add_token_index(w, index)
             index += 1
         logger.info('Build vocab, volume:{size_word_index}'.format(size_word_index=len(self.token_index)))
 

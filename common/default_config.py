@@ -12,10 +12,9 @@
 @Desc    :
 
 '''
-from corpus_generator.standard_generator import FileCorpusGenerator
+from make_tfrecord import TokenizerType, CorpusType
 
 # 数据配置
-from data_processing.tokenizer import SpaceTokenizer
 
 DEFAULT_DATASET = 'unknown_data'
 DEFAULT_DATA_ROOT = '../data/{}/'.format(DEFAULT_DATASET)
@@ -23,8 +22,8 @@ DEFAULT_DATA_FILE = '../data/{}/corpus.txt'.format(DEFAULT_DATASET)
 DEFAULT_TFRECORDS_D_PATH = 'tfrecords/{}/'.format(DEFAULT_DATASET)
 DEFAULT_VOCAB_FILE = '{}/vocab.txt'.format(DEFAULT_TFRECORDS_D_PATH)
 DEFAULT_RECORD_FILENAME = 'record.json'
-DEFAULT_TYPE_CORPUS_GENERATOR = FileCorpusGenerator.TYPE
-DEFAULT_TYPE_TOKENIZER = SpaceTokenizer.TYPE
+DEFAULT_TYPE_CORPUS_GENERATOR = CorpusType.FILE.value
+DEFAULT_TYPE_TOKENIZER = TokenizerType.SPACE.value
 
 # 公共配置
 DEFAULT_TGT_LEN = 100

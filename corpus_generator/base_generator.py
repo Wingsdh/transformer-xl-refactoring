@@ -19,7 +19,6 @@ class ICorpusGenerator(ABC):
     """
     抽象语料迭代器的行为
     """
-    TYPE = 'base'
 
     @classmethod
     @abstractmethod

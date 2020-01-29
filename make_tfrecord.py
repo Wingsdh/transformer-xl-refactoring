@@ -10,6 +10,7 @@
                    2020/1/18: Create
 -------------------------------------------------
 """
+from enum import Enum
 import os
 
 import tensorflow as tf
@@ -18,10 +19,21 @@ from absl import flags
 import common.default_config as cfg
 from common.log import logger
 from corpus_generator.standard_generator import DirCorpusGenerator, FileCorpusGenerator
-from corpus_generator.wiki2019zh_generator import Wiki2019zhGenerator
 from data_processing.tfrecord_process import TFRecordMaker
 from data_processing.tokenizer import CharTokenizer, SpaceTokenizer, CustomTokenizer
 from data_processing.vocabulary import Vocabulary
+
+
+class CorpusType(Enum):
+    FILE = 'file'
+    DIR = 'dir'
+    WIKI2019 = 'wiki2019zh'
+
+
+class TokenizerType(Enum):
+    CHAR = 'char'
+    SPACE = 'space'
+    JIEBA = 'jieba'
 
 
 def check_paths():
@@ -35,33 +47,41 @@ def check_paths():
 
 
 def build_tokenizer():
-    if FLAGS.type_tokenizer == CharTokenizer.TYPE:
+    type_tokenizer = FLAGS.type_tokenizer
+    if type_tokenizer == TokenizerType.CHAR.value:
         return CharTokenizer.new_instance()
 
-    elif FLAGS.type_tokenizer == SpaceTokenizer.TYPE:
+    elif type_tokenizer == TokenizerType.SPACE.value:
         return SpaceTokenizer.new_instance()
 
-    elif FLAGS.type_tokenizer == 'jieba':
+    elif type_tokenizer == TokenizerType.JIEBA.value:
         import jieba
         return CustomTokenizer.new_instance(func=lambda text: jieba.lcut(text))
 
     else:
-        raise ValueError('Unknown tokenizer type: {}'.format(FLAGS.type_corpus_gen))
+        raise ValueError('Unknown tokenizer type: {}'.format(type_tokenizer))
 
 
 def build_corpus_iter():
     type_corpus_gen = FLAGS.type_corpus_gen
-    if type_corpus_gen == FileCorpusGenerator.TYPE:
+    if type_corpus_gen == CorpusType.FILE.value:
         return FileCorpusGenerator.new_instance(FLAGS.file_path)
 
-    if type_corpus_gen == DirCorpusGenerator.TYPE:
+    elif type_corpus_gen == CorpusType.DIR.value:
         return DirCorpusGenerator.new_instance(FLAGS.dir_path, recursive=True)
 
-    if type_corpus_gen == Wiki2019zhGenerator.TYPE:
-        return Wiki2019zhGenerator.new_instance(FLAGS.dir_path, recursive=True)
+    elif type_corpus_gen == CorpusType.WIKI2019.value:
+        import json
+
+        def split_line(text):
+            json_string = json.loads(text)
+            text = json_string.get('text', '')
+            return text.split()
+
+        return DirCorpusGenerator(FLAGS.dir_path, recursive=True, split_func=split_line)
 
     else:
-        raise ValueError('Unknown corpus iter type: {}'.format(FLAGS.type_corpus_gen))
+        raise ValueError('Unknown corpus iter type: {}'.format(type_corpus_gen))
 
 
 def build_vocabulary(tokenizer, corpus_iter=None):

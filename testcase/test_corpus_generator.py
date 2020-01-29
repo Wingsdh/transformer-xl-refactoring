@@ -16,7 +16,6 @@ from ddt import ddt, data
 
 from common.log import logger
 from corpus_generator.standard_generator import FileCorpusGenerator, DirCorpusGenerator
-from corpus_generator.wiki2019zh_generator import Wiki2019zhGenerator
 
 
 class SingleFileCorpusGeneratorTestCase(unittest.TestCase):
@@ -130,7 +129,14 @@ class Wiki2019zhGeneratorTestCase(unittest.TestCase):
         """
         测试迭代器是否正确迭代用户数据
         """
-        line_iter = Wiki2019zhGenerator.new_instance(self.TEST_DIR_PATH, encoding='utf-8')
+        import json
+
+        def split_line(text):
+            json_string = json.loads(text)
+            text = json_string.get('text', '')
+            return text.split()
+
+        line_iter = DirCorpusGenerator(self.TEST_DIR_PATH, encoding='utf-8', recursive=True, split_func=split_line)
         for idx, line in enumerate(line_iter):
             logger.info("{}:{}".format(idx, line))
 

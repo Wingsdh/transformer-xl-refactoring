@@ -32,7 +32,7 @@
 
    TFRecorder <将语料转存为TFRecord文件>
 
-   ![预处理模块](diagram/corpus_processing.png)
+   ![预处理模块](https://github.com/Wingsdh/transformer-xl-refactoring/diagram/corpus_processing.png)
 
 
 

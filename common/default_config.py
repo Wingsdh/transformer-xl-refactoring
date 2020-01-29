@@ -12,7 +12,6 @@
 @Desc    :
 
 '''
-from make_tfrecord import TokenizerType, CorpusType
 
 # 数据配置
 
@@ -22,8 +21,8 @@ DEFAULT_DATA_FILE = '../data/{}/corpus.txt'.format(DEFAULT_DATASET)
 DEFAULT_TFRECORDS_D_PATH = 'tfrecords/{}/'.format(DEFAULT_DATASET)
 DEFAULT_VOCAB_FILE = '{}/vocab.txt'.format(DEFAULT_TFRECORDS_D_PATH)
 DEFAULT_RECORD_FILENAME = 'record.json'
-DEFAULT_TYPE_CORPUS_GENERATOR = CorpusType.FILE.value
-DEFAULT_TYPE_TOKENIZER = TokenizerType.SPACE.value
+DEFAULT_TYPE_CORPUS_GENERATOR = None
+DEFAULT_TYPE_TOKENIZER = None
 
 # 公共配置
 DEFAULT_TGT_LEN = 100

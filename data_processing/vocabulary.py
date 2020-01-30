@@ -62,10 +62,13 @@ def _arrange_vocab_from_corpus(corpus_iter,
         if text_processor is not None:
             line = text_processor.process(line)
 
+        if len(line) <= 0:
+            continue
+
         tokens = tokenizer.tokenize(line)
 
         for token in tokens:
-            vocab._count_token(token)
+            vocab.count_token(token)
 
     vocab.build_vocab_from_word_count(max_n_tokens, min_freq)
 
@@ -165,7 +168,7 @@ class Vocabulary(ABC):
             raise TypeError("text_processor isn't instance of ITextProcessor but {}".format(type(text_processor)))
         self.text_processor = text_processor
 
-    def _count_token(self, token):
+    def count_token(self, token):
         if token in self.token_count:
             self.token_count[token] += 1
         else:

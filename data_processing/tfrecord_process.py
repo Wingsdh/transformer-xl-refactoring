@@ -191,6 +191,9 @@ class TFRecordMaker(object):
         file_names = []
         for idx, line in enumerate(self._corpus_iter):
             seq = self._vocab.text_to_sequence(line, add_start=self._add_start, add_end=self._add_end)
+            if len(seq):
+                continue
+
             encoded.append(seq)
             total += len(seq)
             if _check_enough_to_save(total):

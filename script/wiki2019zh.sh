@@ -21,6 +21,8 @@ RECORD_FILENAME=record_info-train.json
 # vocab params
 TYPE_CORPUS_GEN=wiki2019zh
 TYPE_TOKENIZER=char
+MIN_FREQ=10
+MAX_N_TOKEN=-1
 
 # Model
 N_LAYER=3
@@ -50,6 +52,8 @@ if [[ $1 == 'train_data' ]]; then
     --type_tokenizer=${TYPE_TOKENIZER} \
     --batch_size=${BATCH_SIZE} \
     --tgt_len=${TGT_LEN} \
+    --min_freq=${MIN_FREQ} \
+    --max_n_token=${MAX_N_TOKEN} \
     "${@:2}"
 
 elif [[ $1 == 'eval_data' ]]; then

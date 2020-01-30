@@ -89,7 +89,9 @@ def build_vocabulary(tokenizer, corpus_iter=None):
     if os.path.exists(vocab_f_path):
         vocab = Vocabulary.new_from_save_file(vocab_f_path, tokenizer=tokenizer)
     else:
-        vocab = Vocabulary.new_from_corpus(corpus_iter, tokenizer=tokenizer)
+        vocab = Vocabulary.new_from_corpus(corpus_iter, tokenizer=tokenizer,
+                                           max_n_tokens=FLAGS.max_n_token,
+                                           min_freq=FLAGS.min_freq)
         Vocabulary.save_vocab(vocab, vocab_f_path)
     return vocab
 
@@ -125,6 +127,8 @@ if __name__ == "__main__":
 
     flags.DEFINE_string("type_corpus_gen", cfg.DEFAULT_TYPE_CORPUS_GENERATOR, help="Type of corpus generator")
     flags.DEFINE_string("type_tokenizer", cfg.DEFAULT_TYPE_TOKENIZER, help="Type of corpus generator")
+    flags.DEFINE_integer("max_n_token", cfg.DEFAULT_MAX_N_TOKEN, help="Max num of tokens")
+    flags.DEFINE_integer("min_freq", cfg.DEFAULT_MIN_FREQ, help="Min freq of token in corpus")
 
     flags.DEFINE_integer("batch_size", cfg.DEFAULT_BATCH_SIZE, help="train batch size each host")
     flags.DEFINE_integer("tgt_len", cfg.DEFAULT_TGT_LEN, help="number of tokens to predict")

@@ -50,7 +50,7 @@ class TFRecordProcessTestCase(unittest.TestCase):
         # 预设基本数据
         tokenizer = CharTokenizer.new_instance()
         self.vocab = Vocabulary.new_from_save_file(self.VOCAB_FILE, tokenizer=tokenizer)
-        self.line_iter = DirCorpusGenerator.new_instance(self.TEST_DIR_PATH)
+        self.line_iter = DirCorpusGenerator.new_instance(self.TEST_DIR_PATH, recursive=True)
 
     def testTFRecordProcess(self):
         tf_record_maker = TFRecordMaker(self.line_iter, self.vocab, dataset_name='TEST', add_start=True,

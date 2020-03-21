@@ -73,12 +73,21 @@ def build_corpus_iter():
     elif type_corpus_gen == CorpusType.WIKI2019.value:
         import json
 
+        def is_non_cn_char_line(text, threshold=0.8):
+            num_cn_char = len([c for c in text if not '\u4e00' <= c <= '\u9fa5'])
+            if num_cn_char / len(text) > threshold:
+                return True
+            else:
+                return False
+
         def split_line(text):
             json_string = json.loads(text)
             text = json_string.get('text', '')
-            return text.split()
+            # 只取长度大于10的中文文本
+            return [line for line in text.split('\n') if len(line) > 10 and not is_non_cn_char_line(line)]
 
-        return DirCorpusGenerator(FLAGS.dir_path, recursive=True, split_func=split_line)
+        return DirCorpusGenerator(
+            FLAGS.dir_path, recursive=True, split_func=split_line)
 
     else:
         raise ValueError('Unknown corpus iter type: {}'.format(type_corpus_gen))

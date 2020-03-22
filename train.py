@@ -184,10 +184,10 @@ if __name__ == "__main__":
     flags.DEFINE_integer("train_steps", default=cfg.TRAIN_STEPS,
                          help="Total number of training steps.")
 
-    flags.DEFINE_integer("iterations", default=2,
+    flags.DEFINE_integer("iterations", default=1,
                          help="Number of iterations per repeat loop.")
 
-    flags.DEFINE_integer("save_steps", default=4,
+    flags.DEFINE_integer("save_steps", default=2,
                          help="number of steps for model checkpointing.")
     flags.DEFINE_string("model_dir", default=None,
                         help="Estimator model_dir.")

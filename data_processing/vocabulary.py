@@ -10,17 +10,29 @@
                    2020/1/3: Create
 -------------------------------------------------
 """
-from abc import ABC
+from abc import ABC, abstractmethod
 from collections import OrderedDict
+import os
 
 from tqdm import tqdm
 
 from common.log import logger
 from data_processing.text_processor import ITextProcessor
 from data_processing.tokenizer import SpaceTokenizer, ITextTokenizer
+import sentencepiece as spm
 
 NO_LIMIT_MAX_N_WORD = -1
 NO_LIMIT_MIN_FREQ = 0
+
+
+class IVocabulary(ABC):
+    @abstractmethod
+    def __len__(self):
+        pass
+
+    @abstractmethod
+    def text_to_sequence(self, text, *args, **kwargs):
+        pass
 
 
 def _save_vocab_to_file(vocab, save_file_path):
@@ -100,7 +112,7 @@ def _load_from_token_count_txt(path, tokenizer=None, text_processor=None):
     return vocab
 
 
-class Vocabulary(ABC):
+class Vocabulary(IVocabulary):
     """
     词汇库类
     """
@@ -225,7 +237,7 @@ class Vocabulary(ABC):
 
         return sequence
 
-    def text_to_sequence(self, text, add_start=False, add_end=False):
+    def text_to_sequence(self, text, add_start=False, add_end=False, *args, **kwargs):
         """
         文本转成序列
         :param text:
@@ -278,3 +290,45 @@ class Vocabulary(ABC):
         Returns: summary str
         """
         return 'Word Total: {total}'.format(total=len(self))
+
+
+class SentencePieceVocabulary(IVocabulary):
+    """
+    应用Sentence piece工具分词
+    https://github.com/google/sentencepiece/blob/master/python/
+    """
+    ARG_KEY_SPM_F_PATH = 'path'
+
+    @classmethod
+    def new_instance(cls, *args, **kwargs):
+        f_path = kwargs.get(cls.ARG_KEY_SPM_F_PATH, None)
+        if f_path is None:
+            raise ValueError('param: path can not be None!')
+        elif not os.path.exists(f_path):
+            raise FileExistsError('param: path {} must exist'.format(f_path))
+
+        return cls(f_path)
+
+    def tokenize_as_pieces(self, text):
+        return self.spm_processor.EncodeAsPieces(text)
+
+    def __len__(self):
+        return self.spm_processor.get_piece_size()
+
+    def text_to_sequence(self, text, *args, **kwargs):
+        return self.spm_processor.EncodeAsIds(text)
+
+    def sequences_to_texts(self, sequences):
+        texts = []
+        for seq in sequences:
+            text = self.spm_processor.DecodeIds(seq.tolist())
+            texts.append(text)
+        return texts
+
+    def __init__(self, spm_model_f_path):
+        """
+        :param spm_model_f_path: str, sentence piece 模型文件
+        """
+        self.spm_model_f_path = spm_model_f_path
+        self.spm_processor = spm.SentencePieceProcessor()
+        self.spm_processor.load(spm_model_f_path)

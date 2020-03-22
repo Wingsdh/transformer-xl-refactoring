@@ -21,7 +21,7 @@ from common.log import logger
 from corpus_generator.standard_generator import DirCorpusGenerator, FileCorpusGenerator
 from data_processing.tfrecord_process import TFRecordMaker
 from data_processing.tokenizer import CharTokenizer, SpaceTokenizer, CustomTokenizer
-from data_processing.vocabulary import Vocabulary
+from data_processing.vocabulary import Vocabulary, SentencePieceVocabulary
 
 
 class CorpusType(Enum):
@@ -95,13 +95,18 @@ def build_corpus_iter():
 
 def build_vocabulary(tokenizer, corpus_iter=None):
     vocab_f_path = FLAGS.vocab_path
-    if os.path.exists(vocab_f_path):
-        vocab = Vocabulary.new_from_save_file(vocab_f_path, tokenizer=tokenizer)
-    else:
-        vocab = Vocabulary.new_from_corpus(corpus_iter, tokenizer=tokenizer,
-                                           max_n_tokens=FLAGS.max_n_token,
-                                           min_freq=FLAGS.min_freq)
-        Vocabulary.save_vocab(vocab, vocab_f_path)
+    vocab_type = FLAGS.vocab_type
+    vocab = None
+    if vocab_type == 'sentence_piece':
+        vocab = SentencePieceVocabulary.new_instance(path=vocab_f_path)
+    elif vocab_type == 'default':
+        if os.path.exists(vocab_f_path):
+            vocab = Vocabulary.new_from_save_file(vocab_f_path, tokenizer=tokenizer)
+        else:
+            vocab = Vocabulary.new_from_corpus(corpus_iter, tokenizer=tokenizer,
+                                               max_n_tokens=FLAGS.max_n_token,
+                                               min_freq=FLAGS.min_freq)
+            Vocabulary.save_vocab(vocab, vocab_f_path)
     return vocab
 
 
@@ -131,6 +136,7 @@ if __name__ == "__main__":
     flags.DEFINE_string("dir_path", cfg.DEFAULT_DATA_ROOT, help="Location of the data corpus")
     flags.DEFINE_string("file_path", cfg.DEFAULT_DATA_FILE, help="File of the data corpus")
     flags.DEFINE_string("vocab_path", cfg.DEFAULT_VOCAB_FILE, help="Vocab path where save vocab")
+    flags.DEFINE_string("vocab_type", cfg.DEFAULT_VOCAB_TYPE, help="Vocab type")
     flags.DEFINE_string("tfrecord_d_path", cfg.DEFAULT_TFRECORDS_D_PATH, help="Tfrecords path where save tfrecords")
     flags.DEFINE_string("record_filename", cfg.DEFAULT_RECORD_FILENAME, help="Record json filename")
 

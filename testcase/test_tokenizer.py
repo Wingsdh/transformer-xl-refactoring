@@ -15,7 +15,7 @@ import unittest
 from ddt import ddt, data
 import jieba
 
-from data_processing.tokenizer import SpaceTokenizer, CharTokenizer, CustomTokenizer
+from data_processing.tokenizer import SpaceTokenizer, CharTokenizer, CustomTokenizer, SentencePieceTokenizer
 
 
 @ddt
@@ -153,6 +153,50 @@ class CustomTokenizerTestCase(unittest.TestCase):
         expect = test_data[self.KEY_EXPECT]
         result = self.tokenizer.tokenize(text)
         self.assertListEqual(result, expect)
+
+    @classmethod
+    def tearDownClass(cls):
+        print('Finish test CustomTokenizerTestCase functions')
+
+
+@ddt
+class SentencePieceTokenizerTestCase(unittest.TestCase):
+    """
+    词库测试用例
+    """
+    KEY_INP_TEXT = 'inp_text'
+    KEY_EXPECT = 'expect'
+
+    @classmethod
+    def setUpClass(cls):
+        print('Start test CustomTokenizerTestCase functions')
+
+    def setUp(self):
+        # 预设基本数据
+        self.tokenizer = SentencePieceTokenizer.new_instance(path='data/wiki_sp_vocab.model.model')
+
+    test_data = [
+        {
+            # 正常输入
+            KEY_INP_TEXT: '孙先生逝世后，多人致赠哀悼孙先生挽联',
+            KEY_EXPECT: ['我', '爱', '北京', '天安门']
+        },
+    ]
+
+    @data(*test_data)
+    def testTokenizer(self, test_data):
+        """
+        测试是否自定义函数是否起作用
+        :param test_data:
+        :return:
+        """
+        text = test_data[self.KEY_INP_TEXT]
+        expect = test_data[self.KEY_EXPECT]
+        result = self.tokenizer.tokenize(text)
+        print(result)
+        pieces = self.tokenizer.tokenize_as_pieces(text)
+        print(pieces)
+        # self.assertListEqual(result, expect)
 
     @classmethod
     def tearDownClass(cls):

@@ -17,7 +17,7 @@ import tensorflow as tf
 
 from common.log import logger
 from corpus_generator.standard_generator import ICorpusGenerator
-from data_processing.vocabulary import Vocabulary
+from data_processing.vocabulary import Vocabulary, IVocabulary
 
 
 def _int64_feature(values):
@@ -123,7 +123,7 @@ class TFRecordMaker(object):
         if not isinstance(corpus_iter, ICorpusGenerator):
             raise ValueError('corpus_iter must be inst of ICorpusGenerator, but {}'.format(type(ICorpusGenerator)))
 
-        if not isinstance(vocab, Vocabulary):
+        if not isinstance(vocab, IVocabulary):
             raise ValueError('vocab must be inst of Vocabulary, but {}'.format(type(vocab)))
 
         self._vocab = vocab

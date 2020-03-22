@@ -20,7 +20,7 @@ import tensorflow as tf
 from corpus_generator.standard_generator import DirCorpusGenerator
 from data_processing.tfrecord_process import TFRecordMaker, TFRecorderLoader
 from data_processing.tokenizer import CharTokenizer
-from data_processing.vocabulary import Vocabulary
+from data_processing.vocabulary import Vocabulary, SentencePieceVocabulary
 
 
 @ddt
@@ -32,8 +32,8 @@ class TFRecordProcessTestCase(unittest.TestCase):
     VOCAB_FILE = 'data/vocab.txt'
     TEMP_D_PATH = 'temp'
 
-    BATCH_SIZE = 3
-    TGT_LEN = 2
+    BATCH_SIZE = 1
+    TGT_LEN = 5
     RECORD_INFO_NAME = 'record_info-train.bsz-{}.tlen-{}.json'.format(BATCH_SIZE, TGT_LEN)
 
     TEST_DIR_PATH = 'data/test_corpus/standard'
@@ -74,6 +74,51 @@ class TFRecordProcessTestCase(unittest.TestCase):
     def tearDownClass(cls):
         print('Finish test TFRecordProcessTestCase functions')
         shutil.rmtree(cls.TEMP_D_PATH)
+
+
+@ddt
+class TFRecordLoaderWiki2019TestCase(unittest.TestCase):
+    """
+    TFRecordMaker 测试用例
+    """
+
+    VOCAB_FILE = 'data/tfrecord/wiki_sp_vocab.model'
+    TEMP_D_PATH = 'data/tfrecord/'
+
+    BATCH_SIZE = 1
+    TGT_LEN = 5
+    RECORD_INFO_NAME = 'record_info-train.json'
+
+    TEST_DIR_PATH = 'data/test_corpus/standard'
+    KEY_KWARGS = 'kwargs'
+    KEY_EXPECT = 'expect'
+
+    @classmethod
+    def setUpClass(cls):
+        print('Start test TFRecordLoaderWiki2019TestCase functions')
+        if not os.path.exists(cls.TEMP_D_PATH):
+            os.mkdir(cls.TEMP_D_PATH)
+
+    def setUp(self):
+        # 预设基本数据
+        self.vocab = SentencePieceVocabulary.new_instance(path=self.VOCAB_FILE)
+
+    def testTFRecordProcess(self):
+        tf_record_loader = TFRecorderLoader(self.TEMP_D_PATH, self.RECORD_INFO_NAME)
+        inp_func = tf_record_loader.get_input_fn(TFRecorderLoader.TYPE_TRAIN, self.BATCH_SIZE)
+        dataset = inp_func()
+        input_feed, label_feed = dataset.make_one_shot_iterator().get_next()
+        with tf.Session() as sess:
+            for _ in range(tf_record_loader.info.n_batch):
+                _x, _y = sess.run([input_feed, label_feed])
+                print('X:{}'.format(self.vocab.sequences_to_texts(_x)))
+                print('y:{}'.format(self.vocab.sequences_to_texts(_y)))
+
+        print(tf_record_loader.info)
+
+    @classmethod
+    def tearDownClass(cls):
+        print('Finish test TFRecordLoaderWiki2019TestCase functions')
 
 
 if __name__ == '__main__':

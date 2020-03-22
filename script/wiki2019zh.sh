@@ -12,10 +12,10 @@ EVAL_DATA_ROOT=../../Data/wiki_zh_val/
 # 验证集Tfrecord目录路径
 EVAL_TFRECORDS_ROOT=../../TFRecord/wiki_zh/val/
 # 模型保存路径
-MODEL_ROOT=../../Model/wiki_zh/
+MODEL_ROOT=../../Model/wiki_zh_11254/
 
 # tfrecord params
-VOCAB_PATH=${TRAIN_TFRECORDS_ROOT}/vocab_wiki2019zh.txt
+VOCAB_PATH=${TRAIN_TFRECORDS_ROOT}/wiki_sp_vocab.model
 RECORD_FILENAME=record_info-train.json
 
 # vocab params
@@ -26,8 +26,8 @@ MAX_N_TOKEN=-1
 
 # Model
 N_LAYER=3
-D_MODEL=100
-D_EMBED=100
+D_MODEL=300
+D_EMBED=300
 N_HEAD=3
 D_HEAD=6
 D_INNER=1000
@@ -46,6 +46,7 @@ if [[ $1 == 'train_data' ]]; then
     --dataset=${DATASET} \
     --dir_path=${TRAIN_DATA_ROOT} \
     --vocab_path=${VOCAB_PATH} \
+    --vocab_type=sentence_piece \
     --tfrecord_d_path=${TRAIN_TFRECORDS_ROOT} \
     --type_corpus_gen=${TYPE_CORPUS_GEN} \
     --record_filename=${RECORD_FILENAME} \

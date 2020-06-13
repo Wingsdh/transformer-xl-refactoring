@@ -12,6 +12,7 @@
 """
 import os
 
+from common.log import logger
 from corpus_generator.base_generator import ICorpusGenerator
 
 
@@ -87,9 +88,44 @@ class DirCorpusGenerator(ICorpusGenerator):
         file_names = self.list_all_file(self.d_path, recursive=self.recursive, check_func=self._check_func)
         for p in file_names:
             with open(p, 'r', encoding='utf8') as file:
+                if self.verbose > 0:
+                    logger.info('Start read {}'.format(p))
                 for line in file:
                     if self._split_func is not None:
                         for per_yield in self._split_func(line.strip()):
                             yield per_yield
                     else:
                         yield line.strip()
+                if self.verbose > 0:
+                    logger.info('End  read {}'.format(p))
+
+
+class MixCorpusGenerator(ICorpusGenerator):
+
+    @classmethod
+    def new_instance(cls, its, *args, **kwargs):
+        """
+        @param its: list, list of ICorpusGenerators
+        @param args:
+        @param kwargs:
+        @return:
+        """
+        for it in its:
+            if not isinstance(it, ICorpusGenerator):
+                raise TypeError(
+                    'To new a MixCorpusGenerator, it must be instance of {} but {}'.format(ICorpusGenerator, type(it)))
+        return cls(its)
+
+    def __init__(self, its):
+        self.its = its
+
+    def __iter__(self):
+        n_lines = 0
+        for it in self.its:
+            for line in it:
+                if n_lines % 99999 == 0:
+                    logger.info('    iter {} lines'.format(n_lines))
+                n_lines += 1
+                yield line
+
+        logger.info('Finish iter, total {} lines'.format(n_lines))

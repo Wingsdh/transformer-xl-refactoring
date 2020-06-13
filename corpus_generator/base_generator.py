@@ -30,6 +30,16 @@ class ICorpusGenerator(ABC):
         # 必须实现迭代内置方法
         raise NotImplementedError
 
+    @property
+    def verbose(self):
+        return self.__verbose
+
+    def __init__(self, verbose=0):
+        """
+        @param verbose: int, 0: simple log or >0: detail log
+        """
+        self.__verbose = verbose
+
     def list_all_file(self, dir_path, recursive=False, check_func=None):
         assert os.path.exists(dir_path)
 

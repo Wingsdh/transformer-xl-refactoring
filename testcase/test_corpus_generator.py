@@ -14,7 +14,8 @@ import unittest
 
 from ddt import ddt, data
 
-from corpus_generator.standard_generator import FileCorpusGenerator, DirCorpusGenerator
+from common.log import logger
+from corpus_generator.standard_generator import FileCorpusGenerator, DirCorpusGenerator, MixCorpusGenerator
 
 
 class SingleFileCorpusGeneratorTestCase(unittest.TestCase):
@@ -26,7 +27,7 @@ class SingleFileCorpusGeneratorTestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        print('Start test SingleFileCorpusGeneratorTestCase functions')
+        logger.info('Start test SingleFileCorpusGeneratorTestCase functions')
 
     def setUp(self):
         # 预设基本数据
@@ -48,7 +49,7 @@ class SingleFileCorpusGeneratorTestCase(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        print('Finish test SingleFileCorpusGeneratorTestCase functions')
+        logger.info('Finish test SingleFileCorpusGeneratorTestCase functions')
 
 
 @ddt
@@ -62,7 +63,7 @@ class DirCorpusGeneratorTestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        print('Start test DirCorpusGeneratorTestCase functions')
+        logger.info('Start test DirCorpusGeneratorTestCase functions')
 
     test_data = [
         # 递归参数
@@ -104,7 +105,7 @@ class DirCorpusGeneratorTestCase(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        print('Finish test DirCorpusGeneratorTestCase functions')
+        logger.info('Finish test DirCorpusGeneratorTestCase functions')
 
 
 @ddt
@@ -118,7 +119,7 @@ class Wiki2019zhGeneratorTestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        print('Start test Wiki2019zhGeneratorTestCase functions')
+        logger.info('Start test Wiki2019zhGeneratorTestCase functions')
 
     def setUp(self):
         # 预设基本数据
@@ -137,11 +138,50 @@ class Wiki2019zhGeneratorTestCase(unittest.TestCase):
 
         line_iter = DirCorpusGenerator(self.TEST_DIR_PATH, encoding='utf-8', recursive=True, split_func=split_line)
         for idx, line in enumerate(line_iter):
-            print("{}:{}".format(idx, line))
+            logger.info("{}:{}".format(idx, line))
 
     @classmethod
     def tearDownClass(cls):
-        print('Finish test Wiki2019zhGeneratorTestCase functions')
+        logger.info('Finish test Wiki2019zhGeneratorTestCase functions')
+
+
+class MixGeneratorTestCase(unittest.TestCase):
+    """
+    MixGeneratorTestCase 测试用例
+    """
+    TEST_DIR_PATH = 'data/test_corpus/wiki2019zh/'
+    KEY_KWARGS = 'kwargs'
+    KEY_EXPECT = 'expect'
+
+    @classmethod
+    def setUpClass(cls):
+        logger.info('Start test MixGeneratorTestCase functions')
+
+    def setUp(self):
+        # 预设基本数据
+        pass
+
+    def testIter(self):
+        """
+        测试迭代器是否正确迭代用户数据
+        """
+        import json
+
+        def split_line(text):
+            json_string = json.loads(text)
+            text = json_string.get('text', '')
+            return text.split()
+
+        line_iter1 = DirCorpusGenerator.new_instance(self.TEST_DIR_PATH, recursive=False)
+        line_iter2 = DirCorpusGenerator(self.TEST_DIR_PATH, encoding='utf-8', recursive=True, split_func=split_line)
+        line_iters = [line_iter1, line_iter2]
+        mix_iter = MixCorpusGenerator.new_instance(line_iters)
+        for idx, line in enumerate(mix_iter):
+            logger.info("{}:{}".format(idx, line))
+
+    @classmethod
+    def tearDownClass(cls):
+        logger.info('Finish test Mix functions')
 
 
 if __name__ == '__main__':

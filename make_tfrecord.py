@@ -18,7 +18,7 @@ from absl import flags
 
 import common.default_config as cfg
 from common.log import logger
-from corpus_generator.standard_generator import DirCorpusGenerator, FileCorpusGenerator
+from corpus_generator.standard_generator import DirCorpusGenerator, FileCorpusGenerator, MixCorpusGenerator
 from data_processing.tfrecord_process import TFRecordMaker
 from data_processing.tokenizer import CharTokenizer, SpaceTokenizer, CustomTokenizer
 from data_processing.vocabulary import Vocabulary, SentencePieceVocabulary
@@ -36,10 +36,29 @@ class TokenizerType(Enum):
     JIEBA = 'jieba'
 
 
-def check_paths():
+def parse_path_and_type():
+    paths_str = FLAGS.data_paths
+    if not paths_str:
+        raise ValueError('Must add a data_paths')
+    paths = [p.strip() for p in paths_str.split(',')]
+
+    type_corpus_gen_str = FLAGS.type_corpus_gens
+    if not type_corpus_gen_str:
+        raise ValueError('Must add a type_corpus_gens')
+    type_corpus_gens = [t.strip() for t in type_corpus_gen_str.split(',')]
+
+    if len(paths) != len(type_corpus_gens):
+        raise ValueError(
+            'Paths must same number with type_corpus_gens, {} <> {}'.format(len(paths), len(type_corpus_gens)))
+
+    return [(p, t) for p, t in zip(paths, type_corpus_gens)]
+
+
+def check_paths(path_types):
     # 语料路径必须存在
-    if not os.path.exists(FLAGS.dir_path):
-        raise ValueError('Oh,Oh, Data dir <{}> not exist'.format(FLAGS.dir_path))
+    for p, _ in path_types:
+        if not os.path.exists(p):
+            raise ValueError('Oh,Oh, Data dir <{}> not exist'.format(p))
 
     if not os.path.exists(FLAGS.tfrecord_d_path):
         logger.info('TFRecord dir <{}> not exist, create it'.format(FLAGS.tfrecord_d_path))
@@ -62,35 +81,38 @@ def build_tokenizer():
         raise ValueError('Unknown tokenizer type: {}'.format(type_tokenizer))
 
 
-def build_corpus_iter():
-    type_corpus_gen = FLAGS.type_corpus_gen
-    if type_corpus_gen == CorpusType.FILE.value:
-        return FileCorpusGenerator.new_instance(FLAGS.file_path)
+def build_corpus_iter(path_types):
+    its = []
+    for data_path, type_corpus_gen in path_types:
+        if type_corpus_gen == CorpusType.FILE.value:
+            it = FileCorpusGenerator.new_instance(data_path)
 
-    elif type_corpus_gen == CorpusType.DIR.value:
-        return DirCorpusGenerator.new_instance(FLAGS.dir_path, recursive=True)
+        elif type_corpus_gen == CorpusType.DIR.value:
+            it = DirCorpusGenerator.new_instance(data_path, recursive=True, check_func=lambda x: x.endswith('txt'))
 
-    elif type_corpus_gen == CorpusType.WIKI2019.value:
-        import json
+        elif type_corpus_gen == CorpusType.WIKI2019.value:
+            import json
 
-        def is_non_cn_char_line(text, threshold=0.8):
-            num_cn_char = len([c for c in text if not '\u4e00' <= c <= '\u9fa5'])
-            if num_cn_char / len(text) > threshold:
-                return True
-            else:
-                return False
+            def is_non_cn_char_line(text, threshold=0.8):
+                num_cn_char = len([c for c in text if not '\u4e00' <= c <= '\u9fa5'])
+                if num_cn_char / len(text) > threshold:
+                    return True
+                else:
+                    return False
 
-        def split_line(text):
-            json_string = json.loads(text)
-            text = json_string.get('text', '')
-            # 只取长度大于10的中文文本
-            return [line for line in text.split('\n') if len(line) > 10 and not is_non_cn_char_line(line)]
+            def split_line(text):
+                json_string = json.loads(text)
+                text = json_string.get('text', '')
+                # 只取长度大于10的中文文本
+                return [line for line in text.split('\n') if len(line) > 10 and not is_non_cn_char_line(line)]
 
-        return DirCorpusGenerator(
-            FLAGS.dir_path, recursive=True, split_func=split_line)
+            it = DirCorpusGenerator(
+                data_path, recursive=True, split_func=split_line)
 
-    else:
-        raise ValueError('Unknown corpus iter type: {}'.format(type_corpus_gen))
+        else:
+            raise ValueError('Unknown corpus iter type: {}'.format(type_corpus_gen))
+        its.append(it)
+    return MixCorpusGenerator.new_instance(its)
 
 
 def build_vocabulary(tokenizer, corpus_iter=None):
@@ -112,11 +134,14 @@ def build_vocabulary(tokenizer, corpus_iter=None):
 
 def main(unused_argv):
     del unused_argv  # Unused
+
+    path_types = parse_path_and_type()
+
     # 校验路径
-    check_paths()
+    check_paths(path_types)
 
     # 语料迭代器
-    corpus_iter = build_corpus_iter()
+    corpus_iter = build_corpus_iter(path_types)
 
     # 分词器
     tokenizer = build_tokenizer()
@@ -133,14 +158,14 @@ def main(unused_argv):
 if __name__ == "__main__":
     FLAGS = flags.FLAGS
     flags.DEFINE_string("dataset", default=cfg.DEFAULT_DATASET, help="Dataset name.")
-    flags.DEFINE_string("dir_path", cfg.DEFAULT_DATA_ROOT, help="Location of the data corpus")
+    flags.DEFINE_string("data_paths", cfg.DEFAULT_DATA_ROOT, help="Paths of the data corpus, dir path or file path")
+    flags.DEFINE_string("type_corpus_gens", cfg.DEFAULT_TYPE_CORPUS_GENERATOR, help="Type of corpus generator")
     flags.DEFINE_string("file_path", cfg.DEFAULT_DATA_FILE, help="File of the data corpus")
     flags.DEFINE_string("vocab_path", cfg.DEFAULT_VOCAB_FILE, help="Vocab path where save vocab")
     flags.DEFINE_string("vocab_type", cfg.DEFAULT_VOCAB_TYPE, help="Vocab type")
     flags.DEFINE_string("tfrecord_d_path", cfg.DEFAULT_TFRECORDS_D_PATH, help="Tfrecords path where save tfrecords")
     flags.DEFINE_string("record_filename", cfg.DEFAULT_RECORD_FILENAME, help="Record json filename")
 
-    flags.DEFINE_string("type_corpus_gen", cfg.DEFAULT_TYPE_CORPUS_GENERATOR, help="Type of corpus generator")
     flags.DEFINE_string("type_tokenizer", cfg.DEFAULT_TYPE_TOKENIZER, help="Type of corpus generator")
     flags.DEFINE_integer("max_n_token", cfg.DEFAULT_MAX_N_TOKEN, help="Max num of tokens")
     flags.DEFINE_integer("min_freq", cfg.DEFAULT_MIN_FREQ, help="Min freq of token in corpus")

@@ -121,7 +121,7 @@ class TFRecordMaker(object):
         :type vocab: Vocabulary
         """
         if not isinstance(corpus_iter, ICorpusGenerator):
-            raise ValueError('corpus_iter must be inst of ICorpusGenerator, but {}'.format(type(ICorpusGenerator)))
+            raise ValueError('corpus_iter must be inst of ICorpusGenerator, but {}'.format(type(corpus_iter)))
 
         if not isinstance(vocab, IVocabulary):
             raise ValueError('vocab must be inst of Vocabulary, but {}'.format(type(vocab)))

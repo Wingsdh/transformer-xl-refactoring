@@ -10,7 +10,6 @@
                    2020/1/19: Create
 -------------------------------------------------
 """
-import math
 import os
 
 import numpy as np
@@ -20,6 +19,7 @@ from absl import flags
 import common.default_config as cfg
 from common.log import logger
 from data_processing.tfrecord_process import TFRecorderLoader
+from train.train_hook import TimeLogHook, TimeSaverHook
 from train.train_op import get_train_op_fn
 from model.transformer_xl import build_transformer_xl
 
@@ -85,7 +85,12 @@ def build_train_graph(inputs, labels, n_token):
     return tower_mems, tower_new_mems, loss, train_op, learning_rate, gnorm, global_step
 
 
-def train_process(info, tower_mems, tower_new_mems, loss, train_op, learning_rate, gnorm, global_step):
+def train_hooks_builder():
+    return [TimeLogHook(60),
+            TimeSaverHook(60, model_d_path=FLAGS.model_dir)]
+
+
+def train_process(info, tower_mems, tower_new_mems, loss, train_op, learning_rate, gnorm, global_step, train_hooks):
     num_batches = info.n_batch
     # Training loop
     per_core_bsz = FLAGS.batch_size // FLAGS.num_core_per_host
@@ -110,39 +115,30 @@ def train_process(info, tower_mems, tower_new_mems, loss, train_op, learning_rat
 
         fetches = [loss, tower_new_mems, global_step, gnorm, learning_rate, train_op]
 
-        total_loss, prev_step = 0., -1
         init_step = sess.run(global_step)
-        epoch = init_step // num_batches
+        for hook in train_hooks:
+            hook.begin(sess=sess, init_step=init_step)
         while True:
             feed_dict = {}
             for i in range(FLAGS.num_core_per_host):
                 for m, m_np in zip(tower_mems[i], tower_mems_np[i]):
                     feed_dict[m] = m_np
 
+            for hook in train_hooks:
+                hook.before_run()
+
             fetched = sess.run(fetches, feed_dict=feed_dict)
 
             loss_np, tower_mems_np, curr_step, gnorm_np, lr_np = fetched[:5]
-            total_loss += loss_np
-
-            if curr_step > 0 and curr_step % num_batches == 0:
-                epoch += 1
-                if curr_step > 0 and epoch % FLAGS.iterations == 0:
-                    curr_loss = total_loss / (curr_step - prev_step)
-                    logger.info(
-                        "[{}] lr {:8.6f} | loss {:.2f} | pplx {:>7.2f} | bpc {:>7.4f} | gnorm {:>7.4f}".format(
-                            epoch, lr_np, curr_loss, math.exp(curr_loss), curr_loss / math.log(2), gnorm_np))
-
-                    total_loss, prev_step = 0., curr_step
-
-                if curr_step > 0 and epoch % FLAGS.save_steps == 0:
-                    save_path = os.path.join(FLAGS.model_dir, "model-{}.ckpt".format(curr_step))
-                    saver.save(sess, save_path)
-                    logger.info("Epoch {} Model saved in path: {}".format(epoch, save_path))
+            for hook in train_hooks:
+                hook.after_run(step=curr_step, loss=loss_np, lr=lr_np)
 
             if curr_step == FLAGS.train_steps:
+                for hook in train_hooks:
+                    hook.end()
                 break
 
-        logger.info("run {} epochs:".format(FLAGS.train_steps // num_batches))
+        logger.info("run {} epoch or {} batchs:".format(FLAGS.train_steps // num_batches, curr_step))
 
 
 def main(unused_argv):
@@ -156,9 +152,11 @@ def main(unused_argv):
     # 训练图
     tower_mems, tower_new_mems, loss, train_op, learning_rate, gnorm, global_step = build_train_graph(inputs, labels,
                                                                                                       info.n_token)
+    # build hooks
+    train_hooks = train_hooks_builder()
 
     # 训练
-    train_process(info, tower_mems, tower_new_mems, loss, train_op, learning_rate, gnorm, global_step)
+    train_process(info, tower_mems, tower_new_mems, loss, train_op, learning_rate, gnorm, global_step, train_hooks)
 
 
 if __name__ == "__main__":

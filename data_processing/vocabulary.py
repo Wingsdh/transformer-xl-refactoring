@@ -26,6 +26,12 @@ NO_LIMIT_MIN_FREQ = 0
 
 
 class IVocabulary(ABC):
+
+    @property
+    @abstractmethod
+    def n_tokens(self):
+        return
+
     @abstractmethod
     def __len__(self):
         pass
@@ -116,6 +122,11 @@ class Vocabulary(IVocabulary):
     """
     词汇库类
     """
+
+    @property
+    def n_tokens(self):
+        return len(self.index_token)
+
     TOKEN_PAD = '<pad>'
     TOKEN_UNKNOWN = '<unk>'
     TOKEN_START = '<s>'
@@ -298,6 +309,10 @@ class SentencePieceVocabulary(IVocabulary):
     https://github.com/google/sentencepiece/blob/master/python/
     """
     ARG_KEY_SPM_F_PATH = 'path'
+
+    @property
+    def n_tokens(self):
+        return self.spm_processor.get_piece_size()
 
     @classmethod
     def new_instance(cls, *args, **kwargs):

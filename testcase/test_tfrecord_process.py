@@ -17,7 +17,7 @@ import unittest
 from ddt import ddt
 import tensorflow as tf
 
-from corpus_generator.standard_generator import DirCorpusGenerator
+from data_processing.standard_generator import DirCorpusGenerator
 from data_processing.tfrecord_process import TFRecordMaker, TFRecorderLoader
 from data_processing.tokenizer import CharTokenizer
 from data_processing.vocabulary import Vocabulary, SentencePieceVocabulary

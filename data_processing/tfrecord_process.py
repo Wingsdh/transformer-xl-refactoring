@@ -16,7 +16,7 @@ import numpy as np
 import tensorflow as tf
 
 from common.log import logger
-from corpus_generator.standard_generator import ICorpusGenerator
+from data_processing.standard_generator import ICorpusGenerator
 from data_processing.vocabulary import Vocabulary, IVocabulary
 
 

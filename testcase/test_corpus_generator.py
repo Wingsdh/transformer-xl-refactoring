@@ -15,7 +15,7 @@ import unittest
 from ddt import ddt, data
 
 from common.log import logger
-from corpus_generator.standard_generator import FileCorpusGenerator, DirCorpusGenerator, MixCorpusGenerator
+from data_processing.standard_generator import FileCorpusGenerator, DirCorpusGenerator, MixCorpusGenerator
 
 
 class SingleFileCorpusGeneratorTestCase(unittest.TestCase):

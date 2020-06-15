@@ -16,7 +16,7 @@ import tensorflow as tf
 from common.gpu_utils import assign_to_gpu
 from layer.attention import build_rel_multihead_attn_func
 from layer.embedding import get_mask_adaptive_embedding_lookup_fn
-from layer.loss import average_grads_and_vars, mask_adaptive_logsoftmax
+from train.loss import average_grads_and_vars, mask_adaptive_logsoftmax
 from layer.position_embedding import positional_embedding
 
 
@@ -216,3 +216,34 @@ def build_transformer_xl(inputs, labels, flags, n_token, initializer, proj_initi
         _grads_and_vars = tower_grads_and_vars[0]
 
     return _loss, _grads_and_vars, _tower_mems, _tower_new_mems
+
+
+def build_inference_graph(flags, n_token):
+    transformer_xl = get_transformer_xl_fn(n_token=n_token,
+                                           n_layer=flags.n_layer,
+                                           d_model=flags.d_model,
+                                           d_embed=flags.d_embed,
+                                           n_head=flags.n_head,
+                                           d_head=flags.d_head,
+                                           d_inner=flags.d_inner,
+                                           dropout=flags.dropout,
+                                           dropatt=flags.dropatt,
+                                           initializer=None,
+                                           proj_initializer=None,
+                                           is_training=False,
+                                           same_length=flags.same_length,
+                                           mem_len=flags.mem_len,
+                                           clamp_len=flags.clamp_len,
+                                           untie_r=flags.untie_r)
+
+    inp = tf.placeholder(dtype=tf.int32, shape=(1, None))
+    trans = tf.transpose(inp, [1, 0])
+
+    mems = [tf.placeholder(tf.float32, [flags.mem_len, 1, flags.d_model])
+            for _ in range(flags.n_layer)]
+
+    logit, output, new_mems = transformer_xl(trans, mems)
+    prob = tf.nn.softmax(logit)
+    topk = tf.nn.top_k(logit, k=50, name='output/topk')
+
+    return inp, mems, prob, topk, new_mems

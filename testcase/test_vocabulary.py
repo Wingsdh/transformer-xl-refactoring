@@ -16,7 +16,7 @@ import unittest
 
 from ddt import ddt, data
 
-from corpus_generator.standard_generator import FileCorpusGenerator
+from data_processing.standard_generator import FileCorpusGenerator
 from data_processing.tokenizer import CharTokenizer
 from data_processing.vocabulary import Vocabulary
 from data_processing.text_processor import Number2NProcessor

@@ -20,7 +20,7 @@ from absl import flags
 import common.default_config as cfg
 from common.log import logger
 from data_processing.tfrecord_process import TFRecorderLoader
-from layer.train_op import get_train_op_fn
+from train.train_op import get_train_op_fn
 from model.transformer_xl import build_transformer_xl
 
 

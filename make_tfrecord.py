@@ -18,7 +18,7 @@ from absl import flags
 
 import common.default_config as cfg
 from common.log import logger
-from corpus_generator.standard_generator import DirCorpusGenerator, FileCorpusGenerator, MixCorpusGenerator
+from data_processing.standard_generator import DirCorpusGenerator, FileCorpusGenerator, MixCorpusGenerator
 from data_processing.tfrecord_process import TFRecordMaker
 from data_processing.tokenizer import CharTokenizer, SpaceTokenizer, CustomTokenizer
 from data_processing.vocabulary import Vocabulary, SentencePieceVocabulary

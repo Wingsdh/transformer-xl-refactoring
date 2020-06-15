@@ -13,7 +13,7 @@
 import os
 
 from common.log import logger
-from corpus_generator.base_generator import ICorpusGenerator
+from data_processing.base_generator import ICorpusGenerator
 
 
 class FileCorpusGenerator(ICorpusGenerator):

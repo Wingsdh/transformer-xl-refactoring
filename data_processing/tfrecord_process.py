@@ -266,7 +266,9 @@ class TFRecorderLoader(object):
                 else:
                     dataset = tf.data.TFRecordDataset(self._record_info.file_paths[0])
 
-                dataset = dataset.map(parser).cache().repeat()
+                # remove ".cache()", if cache() and too much data,  not enough memory
+                dataset = dataset.map(parser).repeat()
+
                 dataset = dataset.batch(batch_size)
                 dataset = dataset.prefetch(batch_size)
             else:

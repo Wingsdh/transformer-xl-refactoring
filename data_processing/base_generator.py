@@ -34,7 +34,7 @@ class ICorpusGenerator(ABC):
     def verbose(self):
         return self.__verbose
 
-    def __init__(self, verbose=0):
+    def __init__(self, verbose=0, **kwargs):
         """
         @param verbose: int, 0: simple log or >0: detail log
         """

@@ -27,7 +27,7 @@ class FileCorpusGenerator(ICorpusGenerator):
         return self._encoding
 
     @classmethod
-    def new_instance(cls, f_path, encoding='utf-8'):
+    def new_instance(cls, f_path, encoding='utf-8', **kwargs):
         """
         单文本语料迭代器工厂方法
         :param f_path: 语料文件路径
@@ -36,9 +36,10 @@ class FileCorpusGenerator(ICorpusGenerator):
         """
         if not os.path.exists(f_path):
             raise FileNotFoundError('SingleFileCorpusGenerator f_path:{} must exist '.format(f_path))
-        return cls(f_path, encoding)
+        return cls(f_path, encoding, **kwargs)
 
-    def __init__(self, f_path, encoding='utf-8'):
+    def __init__(self, f_path, encoding='utf-8', **kwargs):
+        super().__init__(**kwargs)
         self._f_path = f_path
         self._encoding = encoding
 
@@ -63,7 +64,7 @@ class DirCorpusGenerator(ICorpusGenerator):
         return self._recursive
 
     @classmethod
-    def new_instance(cls, d_path, encoding='utf-8', recursive=False, check_func=None, split_func=None):
+    def new_instance(cls, d_path, encoding='utf-8', recursive=False, check_func=None, split_func=None, **kwargs):
         """
         目录语料迭代器工厂方法
         :param d_path: 语料目录路径
@@ -75,9 +76,10 @@ class DirCorpusGenerator(ICorpusGenerator):
         """
         if not os.path.exists(d_path):
             raise FileNotFoundError('DirCorpusGenerator d_path:{} must exist '.format(d_path))
-        return cls(d_path, encoding, recursive, check_func, split_func)
+        return cls(d_path, encoding, recursive, check_func, split_func, **kwargs)
 
-    def __init__(self, d_path, encoding='utf-8', recursive=False, check_func=None, split_func=None):
+    def __init__(self, d_path, encoding='utf-8', recursive=False, check_func=None, split_func=None, **kwargs):
+        super().__init__(**kwargs)
         self._d_path = d_path
         self._encoding = encoding
         self._recursive = recursive
@@ -114,9 +116,10 @@ class MixCorpusGenerator(ICorpusGenerator):
             if not isinstance(it, ICorpusGenerator):
                 raise TypeError(
                     'To new a MixCorpusGenerator, it must be instance of {} but {}'.format(ICorpusGenerator, type(it)))
-        return cls(its)
+        return cls(its, **kwargs)
 
-    def __init__(self, its):
+    def __init__(self, its, **kwargs):
+        super().__init__(**kwargs)
         self.its = its
 
     def __iter__(self):

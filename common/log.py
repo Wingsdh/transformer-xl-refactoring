@@ -10,5 +10,13 @@
                    2020/1/3: Create
 -------------------------------------------------
 """
+import sys
+
 from loguru import logger
+
 logger = logger
+logger.remove()
+
+log_format = "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <6}</level> | <level>{message}</level>"
+level = 'INFO'
+logger.add(sys.stderr, format=log_format, level=level)

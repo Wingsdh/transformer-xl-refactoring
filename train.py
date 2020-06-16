@@ -10,16 +10,19 @@
                    2020/1/19: Create
 -------------------------------------------------
 """
+import math
 import os
 
 import numpy as np
 import tensorflow as tf
 from absl import flags
+from tensorflow.python.training.basic_session_run_hooks import CheckpointSaverHook, SummarySaverHook
+from tensorflow.python.training.monitored_session import MonitoredSession, ChiefSessionCreator
 
 import common.default_config as cfg
 from common.log import logger
 from data_processing.tfrecord_process import TFRecorderLoader
-from train.train_hook import TimeLogHook, TimeSaverHook
+from train.train_hook import TransXlTrainLogHook
 from train.train_op import get_train_op_fn
 from model.transformer_xl import build_transformer_xl
 
@@ -33,9 +36,20 @@ def check_paths():
         logger.info('Model dir <{}> not exist, create it'.format(FLAGS.model_dir))
         os.makedirs(FLAGS.model_dir)
 
+    log_path = os.path.join(FLAGS.model_dir, 'logs')
+    if not os.path.exists(log_path):
+        logger.info('Log dir <{}> not exist, create it'.format(log_path))
+        os.makedirs(log_path)
 
-def build_dataset():
-    tf_record_loader = TFRecorderLoader(FLAGS.tfrecord_d_path, FLAGS.record_filename)
+    ckpt_path = os.path.join(FLAGS.model_dir, 'ckpt')
+    if not os.path.exists(ckpt_path):
+        logger.info('checkpoint dir <{}> not exist, create it'.format(ckpt_path))
+        os.makedirs(ckpt_path)
+    return FLAGS.tfrecord_d_path, log_path, ckpt_path
+
+
+def build_dataset(tfrecord_d_path):
+    tf_record_loader = TFRecorderLoader(tfrecord_d_path, FLAGS.record_filename)
     inp_func = tf_record_loader.get_input_fn(TFRecorderLoader.TYPE_TRAIN, FLAGS.batch_size)
     dataset = inp_func()
     input_feed, label_feed = dataset.make_one_shot_iterator().get_next()
@@ -82,16 +96,32 @@ def build_train_graph(inputs, labels, n_token):
     # 定义train_op
     train_fn = get_train_op_fn(FLAGS.train_steps, FLAGS.learning_rate, FLAGS.warmup_steps, FLAGS.min_lr_ratio)
     train_op, learning_rate = train_fn(grads_and_vars=grads_and_vars, global_step=global_step)
-    return tower_mems, tower_new_mems, loss, train_op, learning_rate, gnorm, global_step
+
+    def build_summary_op():
+        with tf.name_scope('summary'):
+            tf.summary.scalar('learn_rate', learning_rate)
+            tf.summary.scalar('loss', loss)
+            tf.summary.scalar('pplx', tf.exp(loss))
+            tf.summary.scalar('bpc', loss / math.log(2))
+        return tf.summary.merge_all()
+
+    summary_op = build_summary_op()
+
+    return tower_mems, tower_new_mems, loss, train_op, learning_rate, gnorm, global_step, summary_op
 
 
-def train_hooks_builder():
-    return [TimeLogHook(60),
-            TimeSaverHook(60, model_d_path=FLAGS.model_dir)]
+def train_hooks_builder(loss, global_step, learn_rate, summary_op, log_dir, ckpt_dir):
+    log_hook = TransXlTrainLogHook(loss_tensor=loss,
+                                   learn_rate_tensor=learn_rate,
+                                   step_tensor=global_step,
+                                   every_n_iter=FLAGS.iterations)
+
+    summary_hook = SummarySaverHook(1, summary_op=summary_op, output_dir=log_dir)
+    ckpt_save_hook = CheckpointSaverHook(checkpoint_dir=ckpt_dir, save_steps=FLAGS.save_steps)
+    return [log_hook, ckpt_save_hook, summary_hook]
 
 
-def train_process(info, tower_mems, tower_new_mems, loss, train_op, learning_rate, gnorm, global_step, train_hooks):
-    num_batches = info.n_batch
+def train_process(tower_mems, tower_new_mems, train_op, train_hooks, ckpt_dir):
     # Training loop
     per_core_bsz = FLAGS.batch_size // FLAGS.num_core_per_host
 
@@ -99,67 +129,45 @@ def train_process(info, tower_mems, tower_new_mems, loss, train_op, learning_rat
         [np.zeros([FLAGS.mem_len, per_core_bsz, FLAGS.d_model], dtype=np.float32)
          for _ in range(FLAGS.n_layer)] for _ in range(FLAGS.num_core_per_host)
     ]
-    saver = tf.train.Saver()
 
-    with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as sess:
-        sess.run(tf.global_variables_initializer())
-        logger.info("Start train transformer-xl lm for dataset:{}".format(FLAGS.dataset))
+    logger.info("Start train transformer-xl lm for dataset:{}".format(FLAGS.dataset))
 
-        if FLAGS.warm_start_path is not None:
-            logger.info("warm start from {}".format(FLAGS.warm_start_path))
-            try:
-                init_ckpt_path = tf.train.latest_checkpoint(FLAGS.warm_start_path)
-                saver.restore(sess, init_ckpt_path)
-            except ValueError:
-                logger.warning('restore fail invalid path:{}'.format(FLAGS.warm_start_path))
+    with MonitoredSession(session_creator=ChiefSessionCreator(config=tf.ConfigProto(allow_soft_placement=True),
+                                                              checkpoint_dir=ckpt_dir),
+                          hooks=train_hooks) as sess:
 
-        fetches = [loss, tower_new_mems, global_step, gnorm, learning_rate, train_op]
-
-        init_step = sess.run(global_step)
-        for hook in train_hooks:
-            hook.begin(sess=sess, init_step=init_step)
-        while True:
-            feed_dict = {}
+        fetches = [tower_new_mems, train_op]
+        feed_dict = {}
+        while not sess.should_stop():
+            # Segment - Level Recurrence with State Reuse
             for i in range(FLAGS.num_core_per_host):
                 for m, m_np in zip(tower_mems[i], tower_mems_np[i]):
                     feed_dict[m] = m_np
 
-            for hook in train_hooks:
-                hook.before_run()
-
             fetched = sess.run(fetches, feed_dict=feed_dict)
-
-            loss_np, tower_mems_np, curr_step, gnorm_np, lr_np = fetched[:5]
-            for hook in train_hooks:
-                hook.after_run(step=curr_step, loss=loss_np, lr=lr_np)
-
-            if curr_step == FLAGS.train_steps:
-                for hook in train_hooks:
-                    hook.end()
-                break
-
-        logger.info("run {} epoch or {} batchs:".format(FLAGS.train_steps // num_batches, curr_step))
+            tower_mems_np, _ = fetched
 
 
 def main(unused_argv):
     del unused_argv  # Unused
 
-    check_paths()
+    tfrecord_d_path, log_path, ckpt_path = check_paths()
 
-    # 数据
-    info, inputs, labels = build_dataset()
+    info, inputs, labels = build_dataset(tfrecord_d_path)
 
-    # 训练图
-    tower_mems, tower_new_mems, loss, train_op, learning_rate, gnorm, global_step = build_train_graph(inputs, labels,
-                                                                                                      info.n_token)
+    # train graph
+    tower_mems, tower_new_mems, loss, train_op, learning_rate, gnorm, global_step, summary_op = build_train_graph(
+        inputs, labels,
+        info.n_token)
+
     # build hooks
-    train_hooks = train_hooks_builder()
+    train_hooks = train_hooks_builder(loss, global_step, learning_rate, summary_op, log_path, ckpt_path)
 
-    # 训练
-    train_process(info, tower_mems, tower_new_mems, loss, train_op, learning_rate, gnorm, global_step, train_hooks)
+    train_process(tower_mems, tower_new_mems, train_op, train_hooks, ckpt_path)
 
 
 if __name__ == "__main__":
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
     FLAGS = flags.FLAGS
 
     flags.DEFINE_string("dataset", default=cfg.DEFAULT_DATASET, help="Dataset name.")
@@ -182,11 +190,12 @@ if __name__ == "__main__":
     flags.DEFINE_integer("train_steps", default=cfg.TRAIN_STEPS,
                          help="Total number of training steps.")
 
-    flags.DEFINE_integer("iterations", default=1,
+    flags.DEFINE_integer("iterations", default=cfg.N_LOG_STEPS,
                          help="Number of iterations per repeat loop.")
-
-    flags.DEFINE_integer("save_steps", default=2,
+    flags.DEFINE_integer("save_steps", default=cfg.N_SAVE_STEPS,
                          help="number of steps for model checkpointing.")
+    flags.DEFINE_integer("summary_steps", default=cfg.N_SAVE_SUMMARY_STEPS,
+                         help="number of steps for save summary.")
     flags.DEFINE_string("model_dir", default=None,
                         help="Estimator model_dir.")
 

@@ -10,180 +10,83 @@
                    2020/6/15: Create
 -------------------------------------------------
 """
-from abc import ABC
 import math
-import os
-import time
+
+import numpy as np
+from tensorflow.python.training.basic_session_run_hooks import LoggingTensorHook
+from tensorflow.python.training.session_run_hook import SessionRunArgs
 
 from common.log import logger
-import tensorflow as tf
 
 
-class BaseHook(ABC):
+class TransXlTrainLogHook(LoggingTensorHook):
+    """
+    inherit from LoggingTensorHook
+    1. overwrite the method "_log_tensors" to adjust my logger and format
+    2. overwrite after_run to log mean loss
+    """
+    KEY_LOSS = 'loss'
+    KEY_LEARN_RATE = 'learn_rate'
+    KEY_STEP = 'step'
 
-    def begin(self, sess, init_step):
-        pass
+    @classmethod
+    def _format(cls, tensor_values):
+        step = tensor_values[cls.KEY_STEP]
+        loss = tensor_values[cls.KEY_LOSS]
+        lr = tensor_values[cls.KEY_LEARN_RATE]
+        return "[{:5}] lr {:8.6f} | loss {:.4f} | pplx {:>7.2f} | bpc {:>7.4f}".format(
+            step, lr, loss, math.exp(loss), loss / math.log(2))
 
-    def before_run(self):
-        pass
+    def __init__(self, loss_tensor, learn_rate_tensor, step_tensor, *args, **kwargs):
 
-    def after_run(self, step, loss, lr):
-        pass
+        tensors = {self.KEY_LOSS: loss_tensor,
+                   self.KEY_LEARN_RATE: learn_rate_tensor,
+                   self.KEY_STEP: step_tensor}
 
-    def end(self):
-        pass
+        super(TransXlTrainLogHook, self).__init__(tensors=tensors,
+                                                  formatter=self._format,
+                                                  *args, **kwargs)
+        self._total_loss = 0
+        self._n_step = 0
+        self._should_trigger = None
 
+    def before_run(self, run_context):
+        self._should_trigger = self._timer.should_trigger_for_step(self._iter_count)
+        # Run every iter so that can calculate a mean value
+        return SessionRunArgs(self._current_tensors)
 
-class TimeLogHook(BaseHook):
-
-    def __init__(self, interval):
+    def after_run(self, run_context, run_values):
         """
-        Log every <interval> seconds
-
-        @param interval: int, How long between every log.
+        calculate mean loss and log
+        @param run_context:
+        @param run_values:
+        @return:
         """
-        self.__prev_time = time.time()
-        self.interval = interval
-        self.__total_loss = 0
-        self.__prev_step = 0
+        _ = run_context
+        loss = run_values.results[self.KEY_LOSS]
+        self._total_loss += loss
+        self._n_step += 1
+        if self._should_trigger and self._n_step > 0:
+            run_values.results[self.KEY_LOSS] = self._total_loss / self._n_step
+            self._log_tensors(run_values.results)
+            self._total_loss = 0
+            self._n_step = 0
 
-    def begin(self, sess, init_step):
-        logger.info('TimeLog start to hook')
-        self.__prev_time = time.time()
-        self.__prev_step = init_step
+        self._iter_count += 1
 
-    def after_run(self, step, loss, lr):
-        self.__total_loss += loss
-
-        now_interval = time.time() - self.__prev_time
-        if now_interval > self.interval:
-            curr_loss = self.__total_loss / (step - self.__prev_step)
-            logger.info(
-                "[{}] lr {:8.6f} | loss {:.2f} | pplx {:>7.2f} | bpc {:>7.4f} ".format(
-                    step, lr, curr_loss, math.exp(curr_loss), curr_loss / math.log(2)))
-            self.__prev_time = time.time()
-            self.__total_loss = 0
-            self.__prev_step = 0
-
-
-class StepLogHook(BaseHook):
-
-    def __init__(self, log_steps):
-        """
-
-        @param log_steps: `int`, save every N steps.
-
-        """
-        self.__prev_step = 0
-        self.log_steps = log_steps
-        self.__total_loss = 0
-
-    def begin(self, sess, init_step):
-        self.__prev_step = init_step
-
-    def after_run(self, step, loss, lr):
-        self.__total_loss += loss
-
-        interval_steps = step - self.__prev_step
-        if interval_steps > self.log_steps:
-            curr_loss = self.__total_loss / (step - self.__prev_step)
-            logger.info(
-                "[{}] lr {:8.6f} | loss {:.2f} | pplx {:>7.2f} | bpc {:>7.4f} ".format(
-                    step, lr, curr_loss, math.exp(curr_loss), curr_loss / math.log(2)))
-            self.__total_loss = 0
-            self.__prev_step = step
-
-
-class SaverHook(BaseHook):
-    def __init__(self, model_d_path, warm_start_d_path=None):
-        """
-        @param model_d_path: str, path to save model
-        @param warm_start_d_path: path to warm start
-        """
-        self.model_d_path = model_d_path
-        if self.warm_start_d_path and os.path.exists(self.warm_start_d_path):
-            self.warm_start_d_path = warm_start_d_path
+    def _log_tensors(self, tensor_values):
+        original = np.get_printoptions()
+        np.set_printoptions(suppress=True)
+        elapsed_secs, _ = self._timer.update_last_triggered_step(self._iter_count)
+        if self._formatter:
+            logger.info(self._formatter(tensor_values))
         else:
-            self.warm_start_d_path = model_d_path
+            stats = []
+            for tag in self._tag_order:
+                stats.append("{} = {}".format(tag, tensor_values[tag]))
+            if elapsed_secs is not None:
+                logger.info("{} ({:.3} sec)".format(", ".join(stats), elapsed_secs))
+            else:
+                logger.info("{}".format(", ".join(stats)))
+        np.set_printoptions(**original)
 
-        if os.path.exists(self.model_d_path):
-            os.makedirs(self.model_d_path)
-
-        self._saver = tf.train.Saver()
-        self._sess = None
-
-    def begin(self, sess, init_step):
-        self._sess = sess
-        logger.info("warm start from {}".format(self.warm_start_d_path))
-        try:
-            init_ckpt_path = tf.train.latest_checkpoint(self.warm_start_d_path)
-            self._saver.restore(sess, init_ckpt_path)
-        except ValueError:
-            logger.warning('restore fail invalid path:{}'.format(self.warm_start_d_path))
-
-    def save_check_point(self, step, loss):
-        save_path = os.path.join(self.model_d_path, "model_{}_{.:4}.ckpt".format(step, loss))
-        self._saver.restore(self._sess, save_path)
-        logger.info("Save Model saved in path: {}".format(save_path))
-
-
-class TimeSaverHook(SaverHook):
-    """
-    Judge whether to save by time.
-    """
-
-    def __init__(self, interval, model_d_path, warm_start_d_path=None):
-        """
-
-        @param interval:
-        @param model_d_path: str, path to save model
-        @param warm_start_d_path: path to warm start
-        """
-        super(TimeSaverHook, self).__init__(model_d_path=model_d_path,
-                                            warm_start_d_path=warm_start_d_path)
-        self.interval = interval
-        self.__prev_time = time.time()
-        self.__total_loss = 0
-        self.__prev_step = 0
-
-    def begin(self, sess, init_step):
-        self.__prev_step = init_step
-
-    def after_run(self, step, loss, lr):
-        self.__total_loss += loss
-        if time.time() - self.__prev_time > self.interval:
-            curr_loss = self.__total_loss / (step - self.__prev_step)
-            self.save_check_point(step, curr_loss)
-            self.__prev_step = step
-            self.__total_loss = 0
-            self.__prev_time = time.time()
-
-
-class StepSaverHook(SaverHook):
-    """
-    Judge whether to save by steps.
-    """
-
-    def __init__(self, save_steps, model_d_path, warm_start_d_path=None):
-        """
-        Save checkpoint every {save_steps}
-        @param save_steps: int, every {save_steps} steps trigger a save process
-        @param model_d_path: str, path to save model
-        @param warm_start_d_path: path to warm start
-        """
-        super(StepSaverHook, self).__init__(model_d_path=model_d_path,
-                                            warm_start_d_path=warm_start_d_path)
-        self.save_steps = save_steps
-        self.__total_loss = 0
-        self.__prev_step = 0
-
-    def begin(self, sess, init_step):
-        self.__prev_step = init_step
-
-    def after_run(self, step, loss, lr):
-        self.__total_loss += loss
-        if step - self.__prev_step > self.save_steps:
-            curr_loss = self.__total_loss / (step - self.__prev_step)
-            self.save_check_point(step, curr_loss)
-            self.__prev_step = step
-            self.__total_loss = 0

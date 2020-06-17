@@ -1,9 +1,23 @@
 # transformer-xl-refactoring
 对于论文 [Transformer-XL: Attentive Language Models Beyond a Fixed-Length Context](http://arxiv.org/abs/1901.02860) 官方源码的重构
 
-[![PyPI pyversions](https://img.shields.io/pypi/pyversions/tensorflow.svg)]()[![Ask Me Anything !](https://img.shields.io/badge/Ask%20me-anything-1abc9c.svg)](https://www.zhihu.com/people/wingsallblue)[![contributions](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)](https://github.com/Wingsdh/transformer-xl-refactoring/issues)[![GitHub stars](https://img.shields.io/github/stars/wingsdh/transformer-xl-refactoring?style=social)](https://github.com/Wingsdh/transformer-xl-refactoring)
+[![PyPI pyversions](https://img.shields.io/pypi/pyversions/tensorflow.svg)]() [![Ask Me Anything !](https://img.shields.io/badge/Ask%20me-anything-1abc9c.svg)](https://www.zhihu.com/people/wingsallblue) [![contributions](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)](https://github.com/Wingsdh/transformer-xl-refactoring/issues) [![GitHub stars](https://img.shields.io/github/stars/wingsdh/transformer-xl-refactoring?style=social)](https://github.com/Wingsdh/transformer-xl-refactoring)
 
-[TOC]
+
+
+## 目录
+
+  * [1. 使用](#1---)
+    + [1.1下载代码](#11----)
+    + [1.2 收集语料](#12-----)
+    + [1.3 配置脚本](#13-----)
+    + [1.4 语料格式转存为TFRecord](#14--------tfrecord)
+    + [1.5 模型训练](#15-----)
+    + [1.6 训练监控](#16-----)
+    + [1.7 模型部署](#17-----)
+  * [2. 重构思路和算法理解分享](#2------------)
+  * [3. 参考：](#3----)
+
 
 ## 1. 使用
 

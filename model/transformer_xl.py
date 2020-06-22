@@ -177,6 +177,7 @@ def build_transformer_xl(inputs, labels, flags, n_token, initializer, proj_initi
                                            initializer=initializer,
                                            proj_initializer=proj_initializer,
                                            is_training=True,
+                                           mem_len=flags.mem_len,
                                            same_length=flags.same_length,
                                            clamp_len=flags.clamp_len,
                                            untie_r=flags.untie_r)

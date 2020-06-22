@@ -65,62 +65,63 @@ def build_rel_multihead_attn_func(qlen, mlen, n_layer, d_model, n_head, d_head, 
 
     attn_mask = _create_mask(qlen, mlen, same_length)
 
-    def rel_multihead_attn(index, rel_inp, w, mem):
-        rlen = tf.shape(rel_inp)[0]
+    def rel_multihead_attn(index, rel_inp, w, mem, scope='rel_attn'):
+        with tf.variable_scope(scope):
+            rlen = tf.shape(rel_inp)[0]
 
-        qlen = tf.shape(w)[0]
-        bsz = tf.shape(w)[1]
+            qlen = tf.shape(w)[0]
+            bsz = tf.shape(w)[1]
 
-        if mem is not None and mem.shape.ndims > 1:
-            cat = tf.concat([mem, w], 0)
-        else:
-            cat = w
+            if mem is not None and mem.shape.ndims > 1:
+                cat = tf.concat([mem, w], 0)
+            else:
+                cat = w
 
-        w_heads = tf.layers.dense(cat, 3 * n_head * d_head, use_bias=False,
-                                  kernel_initializer=initializer, name='qkv')
+            w_heads = tf.layers.dense(cat, 3 * n_head * d_head, use_bias=False,
+                                      kernel_initializer=initializer, name='qkv')
 
-        # 残差连接
-        r_head_k = tf.layers.dense(rel_inp, n_head * d_head, use_bias=False,
-                                   kernel_initializer=initializer, name='r')
+            # 残差连接
+            r_head_k = tf.layers.dense(rel_inp, n_head * d_head, use_bias=False,
+                                       kernel_initializer=initializer, name='r')
 
-        w_head_q, w_head_k, w_head_v = tf.split(w_heads, 3, -1)
-        w_head_q = w_head_q[-qlen:]
+            w_head_q, w_head_k, w_head_v = tf.split(w_heads, 3, -1)
+            w_head_q = w_head_q[-qlen:]
 
-        klen = tf.shape(w_head_k)[0]
+            klen = tf.shape(w_head_k)[0]
 
-        w_head_q = tf.reshape(w_head_q, [qlen, bsz, n_head, d_head])
-        w_head_k = tf.reshape(w_head_k, [klen, bsz, n_head, d_head])
-        w_head_v = tf.reshape(w_head_v, [klen, bsz, n_head, d_head])
+            w_head_q = tf.reshape(w_head_q, [qlen, bsz, n_head, d_head])
+            w_head_k = tf.reshape(w_head_k, [klen, bsz, n_head, d_head])
+            w_head_v = tf.reshape(w_head_v, [klen, bsz, n_head, d_head])
 
-        r_head_k = tf.reshape(r_head_k, [rlen, n_head, d_head])
+            r_head_k = tf.reshape(r_head_k, [rlen, n_head, d_head])
 
-        _r_w_bias = r_w_bias if not untie_r else r_w_bias[index]
-        rw_head_q = w_head_q + _r_w_bias
+            _r_w_bias = r_w_bias if not untie_r else r_w_bias[index]
+            rw_head_q = w_head_q + _r_w_bias
 
-        _r_r_bias = r_r_bias if not untie_r else r_r_bias[index],
-        rr_head_q = w_head_q + _r_r_bias
+            _r_r_bias = r_r_bias if not untie_r else r_r_bias[index],
+            rr_head_q = w_head_q + _r_r_bias
 
-        AC = tf.einsum('ibnd,jbnd->ijbn', rw_head_q, w_head_k)
-        BD = tf.einsum('ibnd,jnd->ijbn', rr_head_q, r_head_k)
-        BD = _rel_shift(BD)
+            AC = tf.einsum('ibnd,jbnd->ijbn', rw_head_q, w_head_k)
+            BD = tf.einsum('ibnd,jnd->ijbn', rr_head_q, r_head_k)
+            BD = _rel_shift(BD)
 
-        attn_score = (AC + BD) * scale
-        attn_mask_t = attn_mask[:, :, None, None]
-        attn_score = attn_score * (1 - attn_mask_t) - 1e30 * attn_mask_t
+            attn_score = (AC + BD) * scale
+            attn_mask_t = attn_mask[:, :, None, None]
+            attn_score = attn_score * (1 - attn_mask_t) - 1e30 * attn_mask_t
 
-        attn_prob = tf.nn.softmax(attn_score, 1)
-        attn_prob = tf.layers.dropout(attn_prob, dropatt, training=is_training)
+            attn_prob = tf.nn.softmax(attn_score, 1)
+            attn_prob = tf.layers.dropout(attn_prob, dropatt, training=is_training)
 
-        attn_vec = tf.einsum('ijbn,jbnd->ibnd', attn_prob, w_head_v)
-        size_t = tf.shape(attn_vec)
-        attn_vec = tf.reshape(attn_vec, [size_t[0], size_t[1], n_head * d_head])
+            attn_vec = tf.einsum('ijbn,jbnd->ibnd', attn_prob, w_head_v)
+            size_t = tf.shape(attn_vec)
+            attn_vec = tf.reshape(attn_vec, [size_t[0], size_t[1], n_head * d_head])
 
-        attn_out = tf.layers.dense(attn_vec, d_model, use_bias=False,
-                                   kernel_initializer=initializer, name='o')
-        attn_out = tf.layers.dropout(attn_out, dropout, training=is_training)
+            attn_out = tf.layers.dense(attn_vec, d_model, use_bias=False,
+                                       kernel_initializer=initializer, name='o')
+            attn_out = tf.layers.dropout(attn_out, dropout, training=is_training)
 
-        # ToDo: tf 1.x 是否有tf.contrib 之外的接口替代方案？
-        output = tf.contrib.layers.layer_norm(attn_out + w, begin_norm_axis=-1)
+            # ToDo: tf 1.x 是否有tf.contrib 之外的接口替代方案？
+            output = tf.contrib.layers.layer_norm(attn_out + w, begin_norm_axis=-1)
         return output
 
     return rel_multihead_attn

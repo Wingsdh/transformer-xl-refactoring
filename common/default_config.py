@@ -19,7 +19,7 @@ DEFAULT_DATASET = 'unknown_data'
 DEFAULT_DATA_ROOT = '../data/{}/'.format(DEFAULT_DATASET)
 DEFAULT_DATA_FILE = '../data/{}/corpus.txt'.format(DEFAULT_DATASET)
 DEFAULT_TFRECORDS_D_PATH = 'tfrecords/{}/'.format(DEFAULT_DATASET)
-DEFAULT_VOCAB_FILE = '{}/vocab.txt'.format(DEFAULT_TFRECORDS_D_PATH)
+DEFAULT_VOCAB_FILE = './source/spiece.model'
 DEFAULT_VOCAB_TYPE = 'default'
 DEFAULT_RECORD_FILENAME = 'record.json'
 DEFAULT_TYPE_CORPUS_GENERATOR = None
@@ -38,7 +38,7 @@ VOCAB_SZ = 0
 
 # 训练配置
 DEFAULT_NUM_CORE_PER_HOST = 1
-TRAIN_STEPS = 350000
+TRAIN_STEPS = 400000
 MEM_LEN = 100  # Number of steps to cache
 N_SAVE_STEPS = 5000
 N_LOG_STEPS = 2000

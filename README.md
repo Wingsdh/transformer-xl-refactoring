@@ -102,6 +102,7 @@ bash script/wiki2019zh_base.sh train
 ## 3. 参考
 
 - [官方源码](https://github.com/kimiyoung/transformer-xl)
--  [大规模中文自然语言处理语料 Large Scale Chinese Corpus for NLP](https://github.com/brightmart/nlp_chinese_corpus ) 
--  [THUCNews](http://thuctc.thunlp.org/#中文文本分类数据集THUCNews)
--  [SentencePiece](https://github.com/google/sentencepiece)
+- [大规模中文自然语言处理语料 Large Scale Chinese Corpus for NLP](https://github.com/brightmart/nlp_chinese_corpus ) 
+- [THUCNews](http://thuctc.thunlp.org/#中文文本分类数据集THUCNews)
+- [SentencePiece](https://github.com/google/sentencepiece)
+- [Chinese-XLNet](https://github.com/ymcui/Chinese-XLNet#%E6%A8%A1%E5%9E%8B%E4%B8%8B%E8%BD%BD)

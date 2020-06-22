@@ -200,6 +200,7 @@ class TFRecordMaker(object):
                 filename, n_batch = _create_tfrecord_process(encoded, idx_next_file)
                 total_batch += n_batch
                 file_names.append(filename)
+                logger.info('Create tfrecord:{}'.format(filename))
 
                 encoded = []
                 idx_next_file += 1

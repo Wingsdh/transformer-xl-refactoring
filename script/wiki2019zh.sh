@@ -17,21 +17,22 @@ EVAL_TFRECORDS_ROOT=../../TFRecord/${DATASET}_val/val/
 MODEL_ROOT=../../Model/${DATASET}/
 
 # tfrecord params
-VOCAB_PATH=${TRAIN_TFRECORDS_ROOT}/wiki_sp_vocab.model
+VOCAB_PATH=./source/spiece.model
 RECORD_FILENAME=record_info-train.json
 
 
 # Model
-N_LAYER=8
-D_MODEL=300
-D_EMBED=300
-N_HEAD=6
+N_LAYER=12
+D_MODEL=768
+D_EMBED=768
+N_HEAD=12
 D_HEAD=64
-D_INNER=1000
+D_INNER=3072
 
 # train params
-BATCH_SIZE=128
+BATCH_SIZE=32
 TGT_LEN=100
+MEM_LEN=100
 DROPOUT_RATE=0.1
 
 # eval_params
@@ -41,14 +42,15 @@ if [[ $1 == 'train_data' ]]; then
   rm -rf ${TRAIN_TFRECORDS_ROOT}/*.tfrecords
   python make_tfrecord.py \
     --dataset=${DATASET} \
-    --dir_path=${TRAIN_DATA_ROOT} \
+    --data_paths=${TRAIN_DATA_ROOT} \
+    --type_corpus_gens=${TYPE_CORPUS_GEN} \
     --vocab_path=${VOCAB_PATH} \
     --vocab_type=sentence_piece \
     --tfrecord_d_path=${TRAIN_TFRECORDS_ROOT} \
-    --type_corpus_gen=${TYPE_CORPUS_GEN} \
     --record_filename=${RECORD_FILENAME} \
     --batch_size=${BATCH_SIZE} \
     --tgt_len=${TGT_LEN} \
+    --mem_len=${MEM_LEN} \
     "${@:2}"
 
 elif [[ $1 == 'eval_data' ]]; then

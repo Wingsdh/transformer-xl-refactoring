@@ -138,7 +138,7 @@ def single_core_graph(n_token, cutoffs, is_training, inp, tgt, mems):
 
 
 def build_train_graph(inputs, labels, n_token, ps_device, cutoffs):
-    per_core_bsz = FLAGS.train_batch_size // FLAGS.num_core_per_host
+    per_core_bsz = FLAGS.batch_size // FLAGS.num_core_per_host
 
     tower_mems, tower_losses, tower_new_mems, tower_grads_and_vars = [], [], [], []
 

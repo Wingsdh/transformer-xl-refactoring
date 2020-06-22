@@ -20,11 +20,13 @@ from tensorflow.python.training.basic_session_run_hooks import CheckpointSaverHo
 from tensorflow.python.training.monitored_session import MonitoredSession, ChiefSessionCreator
 
 import common.default_config as cfg
+from common.gpu_utils import assign_to_gpu
 from common.log import logger
 from data_processing.tfrecord_process import TFRecorderLoader
+import modeling
+from train.loss import average_grads_and_vars
 from train.train_hook import TransXlTrainLogHook
 from train.train_op import get_train_op_fn
-from model.transformer_xl import build_transformer_xl
 
 
 def check_paths():
@@ -58,31 +60,115 @@ def build_dataset(tfrecord_d_path):
     return tf_record_loader.info, _inputs, _labels
 
 
-def build_train_graph(inputs, labels, n_token):
-    def build_initializer():
-        _initializer = None
-        _proj_initializer = None
+def get_model_fn(n_token, cutoffs):
+    def model_fn(inp, tgt, mems, is_training):
+        inp = tf.transpose(inp, [1, 0])
+        tgt = tf.transpose(tgt, [1, 0])
+
         if FLAGS.init == "uniform":
-            _initializer = tf.initializers.random_uniform(
+            initializer = tf.initializers.random_uniform(
                 minval=-FLAGS.init_range,
                 maxval=FLAGS.init_range,
                 seed=None)
-        elif FLAGS.init == "normal":  # select
-            _initializer = tf.initializers.random_normal(
+        elif FLAGS.init == "normal":
+            initializer = tf.initializers.random_normal(
                 stddev=FLAGS.init_std,
                 seed=None)
-            _proj_initializer = tf.initializers.random_normal(
+            proj_initializer = tf.initializers.random_normal(
                 stddev=FLAGS.proj_init_std,
                 seed=None)
-        return _initializer, _proj_initializer
 
-    initializer, proj_initializer = build_initializer()
+        tie_projs = [False for _ in range(len(cutoffs) + 1)]
 
-    # 定义 transformer 骨干网络
-    loss, grads_and_vars, tower_mems, tower_new_mems, = build_transformer_xl(inputs, labels, FLAGS, n_token,
-                                                                             initializer,
-                                                                             proj_initializer)
+        loss, new_mems = modeling.transformer(
+            dec_inp=inp,
+            target=tgt,
+            mems=mems,
+            n_token=n_token,
+            n_layer=FLAGS.n_layer,
+            d_model=FLAGS.d_model,
+            d_embed=FLAGS.d_embed,
+            n_head=FLAGS.n_head,
+            d_head=FLAGS.d_head,
+            d_inner=FLAGS.d_inner,
+            dropout=FLAGS.dropout,
+            dropatt=FLAGS.dropatt,
+            initializer=initializer,
+            proj_initializer=proj_initializer,
+            is_training=is_training,
+            mem_len=FLAGS.mem_len,
+            cutoffs=cutoffs,
+            tie_projs=tie_projs,
+            input_perms=None,
+            target_perms=None,
+            head_target=None,
+            same_length=FLAGS.same_length,
+            clamp_len=FLAGS.clamp_len,
+            use_tpu=False,
+            untie_r=FLAGS.untie_r)
 
+        # number of parameters
+        num_params = sum([np.prod(v.shape) for v in tf.trainable_variables()])
+        logger.info('#params: {}'.format(num_params))
+
+        if is_training:
+            all_vars = tf.trainable_variables()
+            grads = tf.gradients(loss, all_vars)
+            grads_and_vars = list(zip(grads, all_vars))
+
+            return loss, new_mems, grads_and_vars
+        else:
+            return loss, new_mems
+
+    return model_fn
+
+
+def single_core_graph(n_token, cutoffs, is_training, inp, tgt, mems):
+    model_fn = get_model_fn(
+        n_token=n_token,
+        cutoffs=cutoffs)
+
+    model_ret = model_fn(
+        inp=inp,
+        tgt=tgt,
+        mems=mems,
+        is_training=is_training)
+
+    return model_ret
+
+
+def build_train_graph(inputs, labels, n_token, ps_device, cutoffs):
+    per_core_bsz = FLAGS.train_batch_size // FLAGS.num_core_per_host
+
+    tower_mems, tower_losses, tower_new_mems, tower_grads_and_vars = [], [], [], []
+
+    for i in range(FLAGS.num_core_per_host):
+        reuse = True if i > 0 else None
+        with tf.device(assign_to_gpu(i, ps_device)), tf.variable_scope(tf.get_variable_scope(), reuse=reuse):
+            mems_i = [tf.placeholder(tf.float32,
+                                     [FLAGS.mem_len, per_core_bsz, FLAGS.d_model])
+                      for _ in range(FLAGS.n_layer)]
+
+            loss_i, new_mems_i, grads_and_vars_i = single_core_graph(
+                n_token=n_token,
+                cutoffs=cutoffs,
+                is_training=True,
+                inp=inputs[i],
+                tgt=labels[i],
+                mems=mems_i)
+
+            tower_mems.append(mems_i)
+            tower_losses.append(loss_i)
+            tower_new_mems.append(new_mems_i)
+            tower_grads_and_vars.append(grads_and_vars_i)
+
+    # average losses and gradients across towers
+    if len(tower_losses) > 1:
+        loss = tf.add_n(tower_losses) / len(tower_losses)
+        grads_and_vars = average_grads_and_vars(tower_grads_and_vars)
+    else:
+        loss = tower_losses[0]
+        grads_and_vars = tower_grads_and_vars[0]
     grads, all_vars = zip(*grads_and_vars)
 
     # clip gradient
@@ -158,7 +244,7 @@ def main(unused_argv):
     # train graph
     tower_mems, tower_new_mems, loss, train_op, learning_rate, gnorm, global_step, summary_op = build_train_graph(
         inputs, labels,
-        info.n_token)
+        info.n_token, '/gpu:0', [])
 
     # build hooks
     train_hooks = train_hooks_builder(loss, global_step, learning_rate, summary_op, log_path, ckpt_path)

@@ -78,7 +78,8 @@ def build_tokenizer():
         return CustomTokenizer.new_instance(func=lambda text: jieba.lcut(text))
 
     else:
-        raise ValueError('Unknown tokenizer type: {}'.format(type_tokenizer))
+        return None
+        # raise ValueError('Unknown tokenizer type: {}'.format(type_tokenizer))
 
 
 def build_corpus_iter(path_types):
